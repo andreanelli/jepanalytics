@@ -3,12 +3,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import torch
 
 from jepanalytics.augment import AugmentationConfig
 from jepanalytics.config import TrainingConfig
 from jepanalytics.data import build_synthetic_store
 from jepanalytics.model import EncoderConfig
-from jepanalytics.training import train
+from jepanalytics.training import _restore_rng_state, train
 
 
 def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
@@ -92,3 +93,19 @@ def test_training_resume_appends_metrics_and_records_provenance(tmp_path: Path):
     assert len(final_rows) > len(initial_rows)
     assert manifest["resumed_from"]["start_epoch"] == 1
     assert len(manifest["resumed_from"]["sha256"]) == 64
+
+
+def test_mps_rng_restore_moves_checkpoint_state_to_cpu(monkeypatch):
+    cpu_state = object()
+
+    class LoadedMpsState:
+        def cpu(self):
+            return cpu_state
+
+    restored = []
+    monkeypatch.setattr(torch.mps, "set_rng_state", restored.append)
+    _restore_rng_state(
+        {"mps_random_state": LoadedMpsState()},
+        torch.device("mps"),
+    )
+    assert restored == [cpu_state]

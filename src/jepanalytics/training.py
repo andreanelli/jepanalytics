@@ -262,7 +262,7 @@ def _restore_rng_state(payload: Mapping[str, Any], device: torch.device) -> None
         and "mps_random_state" in payload
         and hasattr(torch.mps, "set_rng_state")
     ):
-        torch.mps.set_rng_state(payload["mps_random_state"])
+        torch.mps.set_rng_state(payload["mps_random_state"].cpu())
 
 
 def _rng_state(device: torch.device) -> dict[str, Any]:
