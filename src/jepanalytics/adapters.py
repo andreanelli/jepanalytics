@@ -89,6 +89,11 @@ class SmartsLabeler:
         molecule = Chem.MolFromSmiles(smiles)
         if molecule is None:
             raise ValueError(f"invalid SMILES: {smiles!r}")
+        return self.label_molecule(molecule)
+
+    def label_molecule(self, molecule: Any) -> np.ndarray:
+        """Label an existing RDKit molecule without reparsing its SMILES."""
+
         return np.asarray(
             [molecule.HasSubstructMatch(pattern) for pattern in self.patterns], dtype=np.float32
         )

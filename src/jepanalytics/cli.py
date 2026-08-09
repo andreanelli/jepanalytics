@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -71,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pretrain = subcommands.add_parser("pretrain", help="run JEPA or MAE pretraining")
     pretrain.add_argument("--config", required=True)
+    pretrain.add_argument("--resume", help="checkpoint to resume without editing the config")
 
     inspect_model = subcommands.add_parser("inspect-model", help="report model parameter counts")
     inspect_model.add_argument("--config", help="training config; defaults to the full encoder")
@@ -152,7 +153,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print(result)
         return 0 if result["valid"] else 1
     if args.command == "pretrain":
-        checkpoint = train(load_training_config(args.config))
+        config = load_training_config(args.config)
+        if args.resume:
+            config = replace(config, resume_from=args.resume)
+        checkpoint = train(config)
         _print({"checkpoint": str(checkpoint.resolve())})
         return 0
     if args.command in {"inspect-model", "init-random-checkpoint"}:

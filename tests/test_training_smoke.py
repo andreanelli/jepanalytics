@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -56,3 +57,36 @@ def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
     assert len(manifest["dataset_manifest_sha256"]) == 64
     assert len(manifest["artifacts"]["best_checkpoint"]["sha256"]) == 64
     assert len(manifest["artifacts"]["metrics"]["sha256"]) == 64
+
+
+def test_training_resume_appends_metrics_and_records_provenance(tmp_path: Path):
+    data = tmp_path / "data"
+    run = tmp_path / "run"
+    build_synthetic_store(data, n_molecules=16, n_bins=64, n_labels=3, seed=5)
+    config = TrainingConfig(
+        data_root=str(data),
+        output_dir=str(run),
+        encoder=EncoderConfig(
+            n_bins=64,
+            patch_size=8,
+            hidden_dim=32,
+            depth=1,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=16,
+        ),
+        epochs=1,
+        batch_size=4,
+        learning_rate=0.001,
+        device="cpu",
+        log_every=1,
+    )
+    train(config, repository=tmp_path)
+    initial_rows = (run / "metrics.jsonl").read_text().splitlines()
+    resumed = replace(config, epochs=2, resume_from=str(run / "last.pt"))
+    train(resumed, repository=tmp_path)
+    final_rows = (run / "metrics.jsonl").read_text().splitlines()
+    manifest = json.loads((run / "run_manifest.json").read_text())
+    assert len(final_rows) > len(initial_rows)
+    assert manifest["resumed_from"]["start_epoch"] == 1
+    assert len(manifest["resumed_from"]["sha256"]) == 64

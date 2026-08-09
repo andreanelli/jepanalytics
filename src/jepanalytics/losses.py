@@ -49,9 +49,12 @@ def embedding_diagnostics(
 ) -> EmbeddingDiagnostics:
     centered = embedding.float() - embedding.float().mean(dim=0, keepdim=True)
     mean_std = float(centered.std(dim=0, unbiased=False).mean().item())
-    singular = torch.linalg.svdvals(centered)
+    # MPS does not implement SVD. Collapse monitoring is non-differentiable and
+    # the matrix is only [2 * batch, hidden], so compute this diagnostic on CPU
+    # without moving any model activations used by the training graph.
+    diagnostic_matrix = centered.cpu() if centered.device.type == "mps" else centered
+    singular = torch.linalg.svdvals(diagnostic_matrix)
     probabilities = singular / singular.sum().clamp_min(1e-12)
     entropy = -(probabilities * probabilities.clamp_min(1e-12).log()).sum()
     rank = float(torch.exp(entropy).item())
     return EmbeddingDiagnostics(mean_std, rank, mean_std < min_std or rank < min_effective_rank)
-

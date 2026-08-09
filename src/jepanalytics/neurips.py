@@ -10,7 +10,7 @@ from typing import Any, Iterable, Iterator, Mapping
 
 import numpy as np
 
-from .adapters import SmartsLabeler, chemistry_identifiers, require_approved_license
+from .adapters import SmartsLabeler, require_approved_license
 from .data import CanonicalStoreWriter
 from .preprocessing import SignalProcessor
 from .signal import AcquisitionFamily, AxisType, AxisUnit, SpectralSignal
@@ -54,18 +54,6 @@ def _arrow_dataset(path: str | Path):
     return dataset
 
 
-def _molecular_properties(smiles: str) -> tuple[int, float]:
-    try:
-        from rdkit import Chem
-        from rdkit.Chem import Descriptors
-    except ImportError as exc:
-        raise RuntimeError("install jepanalytics[chem] for dataset preparation") from exc
-    molecule = Chem.MolFromSmiles(smiles)
-    if molecule is None:
-        raise ValueError(f"invalid SMILES: {smiles!r}")
-    return int(molecule.GetNumHeavyAtoms()), float(Descriptors.ExactMolWt(molecule))
-
-
 def scan_candidates(
     parquet_path: str | Path,
     labeler: SmartsLabeler,
@@ -74,6 +62,12 @@ def scan_candidates(
     excluded_scaffolds: set[str] | None = None,
     strict_scaffold: bool = False,
 ) -> dict[str, MoleculeCandidate]:
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+    except ImportError as exc:
+        raise RuntimeError("install jepanalytics[chem] for dataset preparation") from exc
     dataset = _arrow_dataset(parquet_path)
     excluded_molecules = excluded_molecules or set()
     excluded_scaffolds = excluded_scaffolds or set()
@@ -84,23 +78,26 @@ def scan_candidates(
             smiles = row[SMILES_COLUMN]
             if not smiles:
                 continue
-            try:
-                canonical, molecule_id, scaffold_id = chemistry_identifiers(smiles)
-            except ValueError:
+            molecule = Chem.MolFromSmiles(smiles)
+            if molecule is None:
                 continue
+            canonical = Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
+            molecule_id = Chem.MolToInchiKey(molecule)
+            scaffold_id = MurckoScaffold.MurckoScaffoldSmiles(
+                mol=molecule, includeChirality=True
+            ) or f"__acyclic__:{molecule_id}"
             if molecule_id in excluded_molecules:
                 continue
             if strict_scaffold and scaffold_id in excluded_scaffolds:
                 continue
-            heavy_atoms, exact_mass = _molecular_properties(canonical)
             candidate = MoleculeCandidate(
                 row_id=int(row[ROW_ID_COLUMN]),
                 smiles=canonical,
                 molecule_id=molecule_id,
                 scaffold_id=scaffold_id,
-                heavy_atoms=heavy_atoms,
-                exact_mass=exact_mass,
-                labels=labeler(canonical),
+                heavy_atoms=int(molecule.GetNumHeavyAtoms()),
+                exact_mass=float(Descriptors.ExactMolWt(molecule)),
+                labels=labeler.label_molecule(molecule),
             )
             previous = candidates.get(molecule_id)
             if previous is None or candidate.row_id < previous.row_id:

@@ -33,6 +33,7 @@ class TrainingConfig:
     num_workers: int = 0
     seed: int = 17
     device: str = "auto"
+    resume_from: str | None = None
     acquisition: int | None = None
     excluded_acquisitions: tuple[int, ...] = ()
     log_every: int = 20

@@ -52,6 +52,11 @@ Inspect the full encoder before allocating a training run:
 jepanalytics inspect-model --config configs/pilot.json
 ```
 
+On an Apple Silicon machine with Metal available, use
+`configs/pilot-mps.json`. Its batch size of 64 was selected by the checked M4
+Max calibration; `configs/mps-calibration.json` reproduces the compatibility
+and throughput check before a long run.
+
 ## Public API
 
 ```python
@@ -99,7 +104,7 @@ splits before writing signals:
 ```bash
 pip install -e '.[chem,data]'
 jepanalytics prepare-neurips upstream/data data/processed/pilot \
-  --smarts path/to/published-functional-groups.json \
+  --smarts resources/alberts-2024-functional-groups.json \
   --exclude-molecules data/external/specteach-inchikeys.txt \
   --molecules 100000
 ```

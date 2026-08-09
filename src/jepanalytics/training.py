@@ -192,6 +192,54 @@ def _atomic_checkpoint(payload: Mapping[str, Any], path: Path) -> None:
     os.replace(temporary, path)
 
 
+def _restore_rng_state(payload: Mapping[str, Any], device: torch.device) -> None:
+    if "python_random_state" in payload:
+        random.setstate(payload["python_random_state"])
+    if "numpy_random_state" in payload:
+        np.random.set_state(payload["numpy_random_state"])
+    if "torch_random_state" in payload:
+        torch.set_rng_state(payload["torch_random_state"].cpu())
+    if device.type == "cuda" and "cuda_random_state" in payload:
+        torch.cuda.set_rng_state_all(payload["cuda_random_state"])
+    if (
+        device.type == "mps"
+        and "mps_random_state" in payload
+        and hasattr(torch.mps, "set_rng_state")
+    ):
+        torch.mps.set_rng_state(payload["mps_random_state"])
+
+
+def _rng_state(device: torch.device) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "python_random_state": random.getstate(),
+        "numpy_random_state": np.random.get_state(),
+        "torch_random_state": torch.get_rng_state(),
+    }
+    if device.type == "cuda":
+        state["cuda_random_state"] = torch.cuda.get_rng_state_all()
+    if device.type == "mps" and hasattr(torch.mps, "get_rng_state"):
+        state["mps_random_state"] = torch.mps.get_rng_state()
+    return state
+
+
+def _device_memory_metrics(device: torch.device) -> dict[str, int]:
+    if device.type == "cuda":
+        return {
+            "accelerator_allocated_bytes": int(torch.cuda.memory_allocated(device)),
+            "accelerator_peak_allocated_bytes": int(torch.cuda.max_memory_allocated(device)),
+        }
+    if device.type == "mps" and hasattr(torch.mps, "current_allocated_memory"):
+        metrics = {
+            "accelerator_allocated_bytes": int(torch.mps.current_allocated_memory()),
+        }
+        if hasattr(torch.mps, "driver_allocated_memory"):
+            metrics["accelerator_driver_allocated_bytes"] = int(
+                torch.mps.driver_allocated_memory()
+            )
+        return metrics
+    return {}
+
+
 def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Path:
     seed_everything(config.seed)
     device = resolve_device(config.device)
@@ -233,10 +281,37 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
     write_json_atomic(manifest, output / "run_manifest.json")
     metrics_path = output / "metrics.jsonl"
     global_step = 0
+    start_epoch = 0
     best_loss = math.inf
+    metrics_mode = "w"
+    if config.resume_from:
+        resume_path = Path(config.resume_from)
+        payload = torch.load(resume_path, map_location=device, weights_only=False)
+        experiment.load_state_dict(payload["experiment"])
+        optimizer.load_state_dict(payload["optimizer"])
+        if "scheduler" in payload:
+            scheduler.load_state_dict(payload["scheduler"])
+        if "loader_generator_state" in payload:
+            loader_generator.set_state(payload["loader_generator_state"].cpu())
+        _restore_rng_state(payload, device)
+        global_step = int(payload["global_step"])
+        start_epoch = int(payload["epoch"]) + 1
+        best_loss = float(payload.get("best_loss", payload.get("epoch_loss", math.inf)))
+        metrics_mode = "a"
+        manifest["resumed_from"] = {
+            "path": str(resume_path.resolve()),
+            "sha256": sha256_file(resume_path),
+            "start_epoch": start_epoch,
+            "global_step": global_step,
+        }
+        write_json_atomic(manifest, output / "run_manifest.json")
+    if start_epoch >= config.epochs:
+        raise ValueError(
+            f"checkpoint already completed epoch {start_epoch}; config requests {config.epochs} epochs"
+        )
     start_time = time.monotonic()
-    with metrics_path.open("w") as metrics_file:
-        for epoch in range(config.epochs):
+    with metrics_path.open(metrics_mode) as metrics_file:
+        for epoch in range(start_epoch, config.epochs):
             paired.set_epoch(epoch)
             experiment.train()
             running = 0.0
@@ -260,6 +335,7 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                     "learning_rate": scheduler.get_last_lr()[0],
                     "gradient_norm": float(gradient_norm),
                     "elapsed_seconds": time.monotonic() - start_time,
+                    **_device_memory_metrics(device),
                     **metrics,
                 }
                 metrics_file.write(json.dumps(record, sort_keys=True) + "\n")
@@ -267,6 +343,8 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                     metrics_file.flush()
                 global_step += 1
             epoch_loss = running / max(1, len(loader))
+            is_best = epoch_loss < best_loss
+            best_loss = min(best_loss, epoch_loss)
             checkpoint = {
                 "epoch": epoch,
                 "global_step": global_step,
@@ -275,10 +353,13 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                 "online_encoder": experiment.online.state_dict(),
                 "experiment": experiment.state_dict(),
                 "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+                "loader_generator_state": loader_generator.get_state(),
                 "epoch_loss": epoch_loss,
+                "best_loss": best_loss,
+                **_rng_state(device),
             }
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
+            if is_best:
                 _atomic_checkpoint(checkpoint, output / "best.pt")
             if (epoch + 1) % config.checkpoint_every == 0:
                 _atomic_checkpoint(checkpoint, output / "last.pt")
