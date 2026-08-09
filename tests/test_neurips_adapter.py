@@ -34,19 +34,26 @@ def test_stratified_sample_handles_more_strata_than_requested_molecules():
     assert len(selected) == 2
 
 
-def test_native_neurips_schema_conversion(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("ms_prefix", "include_materialized_index"),
+    [("msms_cfmid_", True), ("msms_", False)],
+)
+def test_native_neurips_schema_conversion(
+    tmp_path: Path, ms_prefix: str, include_materialized_index: bool
+):
     rows = 2
     payload = {
         "smiles": ["CCO", "c1ccccc1"],
-        "__index_level_0__": [101, 102],
         "molecular_formula": ["C2H6O", "C6H6"],
         "ir_spectra": [[0.0] * 1800 for _ in range(rows)],
         "h_nmr_spectra": [[0.0] * 10_000 for _ in range(rows)],
         "c_nmr_spectra": [[0.0] * 10_000 for _ in range(rows)],
     }
+    if include_materialized_index:
+        payload["__index_level_0__"] = [101, 102]
     for polarity in ("positive", "negative"):
         for energy in (10, 20, 40):
-            payload[f"msms_cfmid_{polarity}_{energy}ev"] = [
+            payload[f"{ms_prefix}{polarity}_{energy}ev"] = [
                 [[31.0, 20.0], [45.0, 100.0]],
                 [[39.0, 10.0], [77.0, 100.0]],
             ]

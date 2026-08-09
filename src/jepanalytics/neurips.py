@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any, Iterator, Mapping, Sequence
 
 import numpy as np
 
@@ -18,17 +18,16 @@ from .splits import scaffold_split, split_digest
 
 
 SMILES_COLUMN = "smiles"
-ROW_ID_COLUMN = "__index_level_0__"
 DENSE_COLUMNS = ("ir_spectra", "h_nmr_spectra", "c_nmr_spectra")
-MS_COLUMNS = (
-    "msms_cfmid_positive_10ev",
-    "msms_cfmid_positive_20ev",
-    "msms_cfmid_positive_40ev",
-    "msms_cfmid_negative_10ev",
-    "msms_cfmid_negative_20ev",
-    "msms_cfmid_negative_40ev",
+MS_COLUMN_ALIASES = (
+    ("positive", 10, ("msms_positive_10ev", "msms_cfmid_positive_10ev")),
+    ("positive", 20, ("msms_positive_20ev", "msms_cfmid_positive_20ev")),
+    ("positive", 40, ("msms_positive_40ev", "msms_cfmid_positive_40ev")),
+    ("negative", 10, ("msms_negative_10ev", "msms_cfmid_negative_10ev")),
+    ("negative", 20, ("msms_negative_20ev", "msms_cfmid_negative_20ev")),
+    ("negative", 40, ("msms_negative_40ev", "msms_cfmid_negative_40ev")),
 )
-REQUIRED_COLUMNS = (SMILES_COLUMN, ROW_ID_COLUMN, "molecular_formula", *DENSE_COLUMNS, *MS_COLUMNS)
+REQUIRED_COLUMNS = (SMILES_COLUMN, "molecular_formula", *DENSE_COLUMNS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,9 +48,39 @@ def _arrow_dataset(path: str | Path):
         raise RuntimeError("install jepanalytics[data] for Parquet preparation") from exc
     dataset = ds.dataset(str(path), format="parquet")
     missing = sorted(set(REQUIRED_COLUMNS) - set(dataset.schema.names))
+    for polarity, energy, aliases in MS_COLUMN_ALIASES:
+        if not any(column in dataset.schema.names for column in aliases):
+            missing.append(f"MS/MS {polarity} {energy} eV ({' or '.join(aliases)})")
     if missing:
         raise ValueError(f"NeurIPS Parquet schema is missing columns: {missing}")
     return dataset
+
+
+def _resolved_ms_columns(dataset: Any) -> dict[str, tuple[AcquisitionFamily, int]]:
+    result: dict[str, tuple[AcquisitionFamily, int]] = {}
+    for polarity, energy, aliases in MS_COLUMN_ALIASES:
+        column = next(name for name in aliases if name in dataset.schema.names)
+        acquisition = (
+            AcquisitionFamily.MSMS_POSITIVE
+            if polarity == "positive"
+            else AcquisitionFamily.MSMS_NEGATIVE
+        )
+        result[column] = (acquisition, energy)
+    return result
+
+
+def _iter_dataset_rows(
+    dataset: Any, columns: Sequence[str], *, batch_size: int
+) -> Iterator[tuple[int, dict[str, Any]]]:
+    """Yield stable global row IDs across either one file or many fragments."""
+
+    row_id = 0
+    fragments = sorted(dataset.get_fragments(), key=lambda fragment: str(fragment.path))
+    for fragment in fragments:
+        for batch in fragment.to_batches(columns=list(columns), batch_size=batch_size):
+            for row in batch.to_pylist():
+                yield row_id, row
+                row_id += 1
 
 
 def scan_candidates(
@@ -72,36 +101,34 @@ def scan_candidates(
     excluded_molecules = excluded_molecules or set()
     excluded_scaffolds = excluded_scaffolds or set()
     candidates: dict[str, MoleculeCandidate] = {}
-    scanner = dataset.scanner(columns=[SMILES_COLUMN, ROW_ID_COLUMN], batch_size=4096)
-    for batch in scanner.to_batches():
-        for row in batch.to_pylist():
-            smiles = row[SMILES_COLUMN]
-            if not smiles:
-                continue
-            molecule = Chem.MolFromSmiles(smiles)
-            if molecule is None:
-                continue
-            canonical = Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
-            molecule_id = Chem.MolToInchiKey(molecule)
-            scaffold_id = MurckoScaffold.MurckoScaffoldSmiles(
-                mol=molecule, includeChirality=True
-            ) or f"__acyclic__:{molecule_id}"
-            if molecule_id in excluded_molecules:
-                continue
-            if strict_scaffold and scaffold_id in excluded_scaffolds:
-                continue
-            candidate = MoleculeCandidate(
-                row_id=int(row[ROW_ID_COLUMN]),
-                smiles=canonical,
-                molecule_id=molecule_id,
-                scaffold_id=scaffold_id,
-                heavy_atoms=int(molecule.GetNumHeavyAtoms()),
-                exact_mass=float(Descriptors.ExactMolWt(molecule)),
-                labels=labeler.label_molecule(molecule),
-            )
-            previous = candidates.get(molecule_id)
-            if previous is None or candidate.row_id < previous.row_id:
-                candidates[molecule_id] = candidate
+    for row_id, row in _iter_dataset_rows(dataset, [SMILES_COLUMN], batch_size=4096):
+        smiles = row[SMILES_COLUMN]
+        if not smiles:
+            continue
+        molecule = Chem.MolFromSmiles(smiles)
+        if molecule is None:
+            continue
+        canonical = Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
+        molecule_id = Chem.MolToInchiKey(molecule)
+        scaffold_id = MurckoScaffold.MurckoScaffoldSmiles(
+            mol=molecule, includeChirality=True
+        ) or f"__acyclic__:{molecule_id}"
+        if molecule_id in excluded_molecules:
+            continue
+        if strict_scaffold and scaffold_id in excluded_scaffolds:
+            continue
+        candidate = MoleculeCandidate(
+            row_id=row_id,
+            smiles=canonical,
+            molecule_id=molecule_id,
+            scaffold_id=scaffold_id,
+            heavy_atoms=int(molecule.GetNumHeavyAtoms()),
+            exact_mass=float(Descriptors.ExactMolWt(molecule)),
+            labels=labeler.label_molecule(molecule),
+        )
+        previous = candidates.get(molecule_id)
+        if previous is None or candidate.row_id < previous.row_id:
+            candidates[molecule_id] = candidate
     return candidates
 
 
@@ -304,51 +331,42 @@ def build_neurips_store(
     )
     processor = SignalProcessor(n_bins=n_bins)
     dataset = _arrow_dataset(parquet_path)
-    scanner = dataset.scanner(columns=list(REQUIRED_COLUMNS), batch_size=32)
     written_molecules: set[str] = set()
     dense_mapping = {
         "ir_spectra": AcquisitionFamily.IR,
         "h_nmr_spectra": AcquisitionFamily.H1_NMR,
         "c_nmr_spectra": AcquisitionFamily.C13_NMR,
     }
-    ms_mapping = {
-        "msms_cfmid_positive_10ev": (AcquisitionFamily.MSMS_POSITIVE, 10),
-        "msms_cfmid_positive_20ev": (AcquisitionFamily.MSMS_POSITIVE, 20),
-        "msms_cfmid_positive_40ev": (AcquisitionFamily.MSMS_POSITIVE, 40),
-        "msms_cfmid_negative_10ev": (AcquisitionFamily.MSMS_NEGATIVE, 10),
-        "msms_cfmid_negative_20ev": (AcquisitionFamily.MSMS_NEGATIVE, 20),
-        "msms_cfmid_negative_40ev": (AcquisitionFamily.MSMS_NEGATIVE, 40),
-    }
-    for batch in scanner.to_batches():
-        for row in batch.to_pylist():
-            row_id = int(row[ROW_ID_COLUMN])
-            candidate = selected.get(row_id)
-            if candidate is None or candidate.molecule_id in written_molecules:
-                continue
-            split = assignments[candidate.molecule_id]
-            formula = row["molecular_formula"] or ""
-            for column, acquisition in dense_mapping.items():
-                signal = _dense_signal(
-                    row[column],
-                    acquisition,
-                    candidate,
-                    split,
-                    f"{row_id}:{column}",
-                    formula,
-                )
-                writer.append(processor(signal))
-            for column, (acquisition, energy) in ms_mapping.items():
-                signal = _ms_signal(
-                    row[column],
-                    acquisition,
-                    energy,
-                    candidate,
-                    split,
-                    f"{row_id}:{column}",
-                    formula,
-                )
-                writer.append(processor(signal))
-            written_molecules.add(candidate.molecule_id)
+    ms_mapping = _resolved_ms_columns(dataset)
+    columns = ["molecular_formula", *dense_mapping, *ms_mapping]
+    for row_id, row in _iter_dataset_rows(dataset, columns, batch_size=32):
+        candidate = selected.get(row_id)
+        if candidate is None or candidate.molecule_id in written_molecules:
+            continue
+        split = assignments[candidate.molecule_id]
+        formula = row["molecular_formula"] or ""
+        for column, acquisition in dense_mapping.items():
+            signal = _dense_signal(
+                row[column],
+                acquisition,
+                candidate,
+                split,
+                f"{row_id}:{column}",
+                formula,
+            )
+            writer.append(processor(signal))
+        for column, (acquisition, energy) in ms_mapping.items():
+            signal = _ms_signal(
+                row[column],
+                acquisition,
+                energy,
+                candidate,
+                split,
+                f"{row_id}:{column}",
+                formula,
+            )
+            writer.append(processor(signal))
+        written_molecules.add(candidate.molecule_id)
     if len(written_molecules) != len(selected):
         missing = len(selected) - len(written_molecules)
         raise RuntimeError(f"failed to locate {missing} selected molecules during the second pass")
@@ -360,6 +378,7 @@ def build_neurips_store(
             "molecule_candidates": len(candidates),
             "selected_molecules": len(selected),
             "functional_groups": labeler.names,
+            "ms_columns": sorted(ms_mapping),
             "split_sha256": split_digest(assignments),
             "license_audit_entry": dict(audit),
             "strict_scaffold_exclusion": strict_scaffold,
