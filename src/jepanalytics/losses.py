@@ -33,6 +33,26 @@ def variance_regularization(embedding: torch.Tensor, target_std: float = 0.1) ->
     return F.relu(target_std - std).mean()
 
 
+def covariance_regularization(embedding: torch.Tensor) -> torch.Tensor:
+    """Penalize redundant feature directions without suppressing their variance.
+
+    A variance floor prevents constant features, but it cannot detect a matrix in
+    which every feature is a scaled copy of the same latent variable.  The mean
+    squared off-diagonal correlation is close to one for that failure mode and
+    close to ``1 / batch_size`` for independent features.  Normalizing before the
+    correlation keeps this term well-scaled across acquisition families.
+    """
+
+    if embedding.ndim != 2 or embedding.shape[0] < 2:
+        raise ValueError("embedding must have shape [batch >= 2, features]")
+    centered = embedding - embedding.mean(dim=0, keepdim=True)
+    standardized = centered / torch.sqrt(centered.var(dim=0, unbiased=False) + 1e-4)
+    correlation = standardized.T @ standardized / embedding.shape[0]
+    off_diagonal = correlation - torch.diag_embed(torch.diagonal(correlation))
+    n_features = embedding.shape[1]
+    return off_diagonal.square().sum() / max(1, n_features * (n_features - 1))
+
+
 @dataclass(frozen=True, slots=True)
 class EmbeddingDiagnostics:
     mean_feature_std: float

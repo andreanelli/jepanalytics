@@ -21,6 +21,7 @@ from .augment import SpectralAugmenter
 from .config import TrainingConfig, save_config
 from .data import CanonicalSpectraDataset, PairedSpectrumDataset, paired_collate
 from .losses import (
+    covariance_regularization,
     embedding_diagnostics,
     masked_latent_loss,
     symmetric_alignment_loss,
@@ -106,17 +107,23 @@ class JEPAExperiment(nn.Module):
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
-        variance = variance_regularization(combined) if diagnostics.collapsed else combined.new_zeros(())
+        if diagnostics.collapsed:
+            variance = variance_regularization(combined)
+            covariance = covariance_regularization(combined)
+        else:
+            variance = combined.new_zeros(())
+            covariance = combined.new_zeros(())
         total = (
             jepa
             + self.config.alignment_weight * alignment
-            + self.config.variance_weight * variance
+            + self.config.variance_weight * (variance + covariance)
         )
         metrics = {
             "loss": float(total.detach()),
             "jepa_loss": float(jepa.detach()),
             "alignment_loss": float(alignment.detach()),
             "variance_loss": float(variance.detach()),
+            "covariance_loss": float(covariance.detach()),
             "embedding_std": diagnostics.mean_feature_std,
             "effective_rank": diagnostics.effective_rank,
             "collapsed": float(diagnostics.collapsed),

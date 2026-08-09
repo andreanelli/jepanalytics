@@ -1,7 +1,12 @@
 import numpy as np
 import torch
 
-from jepanalytics.losses import embedding_diagnostics, masked_latent_loss, symmetric_alignment_loss
+from jepanalytics.losses import (
+    covariance_regularization,
+    embedding_diagnostics,
+    masked_latent_loss,
+    symmetric_alignment_loss,
+)
 from jepanalytics.masking import mixed_patch_mask
 from jepanalytics.model import EncoderConfig, UniversalSpectrumEncoder
 from jepanalytics.signal import AcquisitionFamily, AxisType, AxisUnit, SpectralSignal
@@ -77,8 +82,22 @@ def test_losses_and_collapse_diagnostics_are_finite():
     assert collapsed.collapsed
 
 
+def test_covariance_regularization_detects_collinear_nonconstant_features():
+    generator = torch.Generator().manual_seed(17)
+    independent = torch.randn(128, 16, generator=generator, requires_grad=True)
+    shared = torch.randn(128, 1, generator=generator)
+    collinear = shared.repeat(1, 16).requires_grad_()
+
+    independent_loss = covariance_regularization(independent)
+    collinear_loss = covariance_regularization(collinear)
+
+    assert collinear.std(dim=0).mean() > 0.1
+    assert collinear_loss > 10 * independent_loss
+    collinear_loss.backward()
+    assert torch.isfinite(collinear.grad).all()
+
+
 def test_default_encoder_parameter_count_matches_preregistered_range():
     model = UniversalSpectrumEncoder()
     count = sum(parameter.numel() for parameter in model.parameters())
     assert 20_000_000 <= count <= 25_000_000
-
