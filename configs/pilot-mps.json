@@ -15,6 +15,13 @@
   "device": "mps",
   "log_every": 20,
   "checkpoint_every": 1,
+  "wandb_enabled": true,
+  "wandb_project": "jepanalytics",
+  "wandb_run_id": "pilot-jepa-a005-mps-s17-v1",
+  "wandb_run_name": "pilot JEPA a=0.05 MPS seed 17",
+  "wandb_group": "universal-jepa-100k",
+  "wandb_tags": ["pilot", "jepa", "mps", "100k-molecules", "alignment-0.05"],
+  "wandb_mode": "online",
   "encoder": {
     "n_bins": 4096,
     "patch_size": 32,

@@ -30,6 +30,7 @@ from .losses import (
 from .manifest import build_run_manifest, sha256_file, write_json_atomic
 from .masking import mixed_patch_mask
 from .model import LatentPredictor, UniversalSpectrumEncoder, batch_to_encoder_kwargs
+from .tracking import WandbTracker
 
 
 def seed_everything(seed: int) -> None:
@@ -364,13 +365,30 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
         raise ValueError(
             f"checkpoint already completed epoch {start_epoch}; config requests {config.epochs} epochs"
         )
+    tracker = WandbTracker.start(
+        config,
+        output=output,
+        run_manifest=manifest,
+        dataset_manifest=dataset.manifest,
+        encoder_parameters=sum(parameter.numel() for parameter in experiment.online.parameters()),
+        train_molecules=len(paired),
+        steps_per_epoch=len(loader),
+    )
+    if tracker.run is not None:
+        manifest["wandb"] = json.loads(tracker.state_path.read_text())
+        if config.resume_from:
+            manifest["wandb"]["backfilled_history_points"] = tracker.backfill(metrics_path)
+        write_json_atomic(manifest, output / "run_manifest.json")
     start_time = time.monotonic()
+    steps_this_process = 0
+    total_steps = config.epochs * len(loader)
     with metrics_path.open(metrics_mode) as metrics_file:
         for epoch in range(start_epoch, config.epochs):
             paired.set_epoch(epoch)
             experiment.train()
             running = 0.0
-            for first, second in loader:
+            for batch_index, (first, second) in enumerate(loader):
+                step_started = time.monotonic()
                 first = move_batch(first, device)
                 second = move_batch(second, device)
                 optimizer.zero_grad(set_to_none=True)
@@ -384,18 +402,32 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                 if isinstance(experiment, JEPAExperiment):
                     experiment.update_target()
                 running += float(loss.detach())
+                step_seconds = time.monotonic() - step_started
+                steps_this_process += 1
+                average_step_seconds = (
+                    time.monotonic() - start_time
+                ) / steps_this_process
                 record = {
                     "epoch": epoch,
                     "step": global_step,
                     "learning_rate": scheduler.get_last_lr()[0],
                     "gradient_norm": float(gradient_norm),
                     "elapsed_seconds": time.monotonic() - start_time,
+                    "step_seconds": step_seconds,
+                    "molecule_pairs_per_second": config.batch_size / step_seconds,
+                    "spectra_per_second": 2 * config.batch_size / step_seconds,
+                    "epoch_progress": (batch_index + 1) / len(loader),
+                    "global_progress": (global_step + 1) / total_steps,
+                    "eta_hours": max(0, total_steps - global_step - 1)
+                    * average_step_seconds
+                    / 3600.0,
                     **_device_memory_metrics(device),
                     **metrics,
                 }
                 metrics_file.write(json.dumps(record, sort_keys=True) + "\n")
                 if global_step % config.log_every == 0:
                     metrics_file.flush()
+                tracker.log_step(record)
                 global_step += 1
             epoch_loss = running / max(1, len(loader))
             is_best = epoch_loss < best_loss
@@ -418,6 +450,12 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                 _atomic_checkpoint(checkpoint, output / "best.pt")
             if (epoch + 1) % config.checkpoint_every == 0:
                 _atomic_checkpoint(checkpoint, output / "last.pt")
+            tracker.log_epoch(
+                epoch=epoch,
+                global_step=max(0, global_step - 1),
+                epoch_loss=epoch_loss,
+                best_loss=best_loss,
+            )
     best_checkpoint = output / "best.pt"
     last_checkpoint = output / "last.pt"
     summary_path = output / "summary.json"
@@ -455,6 +493,15 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
         }
     manifest["artifacts"] = artifacts
     write_json_atomic(manifest, output / "run_manifest.json")
+    tracker.finish(
+        {
+            "status": "complete",
+            "best_epoch_loss": best_loss,
+            "completed_epochs": config.epochs,
+            "completed_steps": global_step,
+            "best_checkpoint_sha256": artifacts["best_checkpoint"]["sha256"],
+        }
+    )
     return best_checkpoint
 
 

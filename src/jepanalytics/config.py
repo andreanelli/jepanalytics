@@ -38,6 +38,14 @@ class TrainingConfig:
     excluded_acquisitions: tuple[int, ...] = ()
     log_every: int = 20
     checkpoint_every: int = 1
+    wandb_enabled: bool = False
+    wandb_project: str = "jepanalytics"
+    wandb_entity: str | None = None
+    wandb_run_id: str | None = None
+    wandb_run_name: str | None = None
+    wandb_group: str | None = None
+    wandb_tags: tuple[str, ...] = ()
+    wandb_mode: str = "online"
 
     def __post_init__(self) -> None:
         if self.objective not in {"jepa", "mae"}:
@@ -46,6 +54,10 @@ class TrainingConfig:
             raise ValueError("alignment_weight must be one of 0, 0.05, or 0.2")
         if not 0.4 <= self.mask_ratio <= 0.6:
             raise ValueError("mask_ratio must remain in the preregistered 40-60% interval")
+        if self.wandb_mode not in {"online", "offline", "disabled"}:
+            raise ValueError("wandb_mode must be online, offline, or disabled")
+        if self.wandb_enabled and not self.wandb_run_id:
+            raise ValueError("wandb_run_id is required when W&B logging is enabled")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -56,6 +68,7 @@ def load_training_config(path: str | Path) -> TrainingConfig:
     raw["encoder"] = EncoderConfig(**raw.get("encoder", {}))
     raw["augmentation"] = AugmentationConfig(**raw.get("augmentation", {}))
     raw["excluded_acquisitions"] = tuple(raw.get("excluded_acquisitions", ()))
+    raw["wandb_tags"] = tuple(raw.get("wandb_tags", ()))
     return TrainingConfig(**raw)
 
 
