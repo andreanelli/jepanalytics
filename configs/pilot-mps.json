@@ -1,6 +1,6 @@
 {
   "data_root": "data/processed/pilot",
-  "output_dir": "runs/pilot-jepa-align005-mps",
+  "output_dir": "runs/pilot-jepa-align005-mps-residual",
   "objective": "jepa",
   "epochs": 20,
   "batch_size": 64,
@@ -10,7 +10,7 @@
   "alignment_weight": 0.05,
   "alignment_temperature": 0.07,
   "ema_decay": 0.996,
-  "variance_weight": 0.1,
+  "variance_weight": 1.0,
   "seed": 17,
   "device": "mps",
   "log_every": 20,

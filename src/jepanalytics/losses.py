@@ -28,12 +28,16 @@ def symmetric_alignment_loss(
     return 0.5 * (F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels))
 
 
-def variance_regularization(embedding: torch.Tensor, target_std: float = 0.1) -> torch.Tensor:
-    std = torch.sqrt(embedding.var(dim=0, unbiased=False) + 1e-4)
+def variance_regularization(
+    embedding: torch.Tensor, target_std: float = 0.1, epsilon: float = 1e-8
+) -> torch.Tensor:
+    std = torch.sqrt(embedding.var(dim=0, unbiased=False) + epsilon)
     return F.relu(target_std - std).mean()
 
 
-def covariance_regularization(embedding: torch.Tensor) -> torch.Tensor:
+def covariance_regularization(
+    embedding: torch.Tensor, epsilon: float = 1e-8
+) -> torch.Tensor:
     """Penalize redundant feature directions without suppressing their variance.
 
     A variance floor prevents constant features, but it cannot detect a matrix in
@@ -46,8 +50,8 @@ def covariance_regularization(embedding: torch.Tensor) -> torch.Tensor:
     if embedding.ndim != 2 or embedding.shape[0] < 2:
         raise ValueError("embedding must have shape [batch >= 2, features]")
     centered = embedding - embedding.mean(dim=0, keepdim=True)
-    standardized = centered / torch.sqrt(centered.var(dim=0, unbiased=False) + 1e-4)
-    correlation = standardized.T @ standardized / embedding.shape[0]
+    standardized = F.normalize(centered, dim=0, eps=epsilon)
+    correlation = standardized.T @ standardized
     off_diagonal = correlation - torch.diag_embed(torch.diagonal(correlation))
     n_features = embedding.shape[1]
     return off_diagonal.square().sum() / max(1, n_features * (n_features - 1))

@@ -53,6 +53,8 @@ def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
     assert np.all(np.isfinite(losses))
     assert np.min(losses[-3:]) < np.mean(losses[:3])
     assert all(row["effective_rank"] > 1 for row in rows)
+    assert all(row["aligned_effective_rank"] > 1 for row in rows)
+    assert all(row["target_signal_residual_norm"] > 0 for row in rows)
     manifest = json.loads((run / "run_manifest.json").read_text())
     assert len(manifest["dataset_manifest_sha256"]) == 64
     assert len(manifest["artifacts"]["best_checkpoint"]["sha256"]) == 64

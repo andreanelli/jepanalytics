@@ -76,7 +76,9 @@ class JEPAExperiment(nn.Module):
         for target, online in zip(self.target.parameters(), self.online.parameters(), strict=True):
             target.mul_(decay).add_(online, alpha=1.0 - decay)
 
-    def _side(self, batch: Mapping[str, torch.Tensor]) -> tuple[torch.Tensor, Any, Any]:
+    def _side(
+        self, batch: Mapping[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, Any, Any, torch.Tensor]:
         context = self.augment(batch["intensity"], light=False)
         target_intensity = self.augment(batch["intensity"], light=True)
         patches = context.unfold(
@@ -86,15 +88,41 @@ class JEPAExperiment(nn.Module):
         context_kwargs = {**batch_to_encoder_kwargs(batch), "intensity": context, "patch_mask": mask}
         online = self.online(**context_kwargs)
         with torch.no_grad():
-            target = self.target(**{**batch_to_encoder_kwargs(batch), "intensity": target_intensity})
+            target = self.target(
+                **{
+                    **batch_to_encoder_kwargs(batch),
+                    "intensity": target_intensity,
+                }
+            )
+            metadata_only = self.target(
+                **{
+                    **batch_to_encoder_kwargs(batch),
+                    "intensity": torch.zeros_like(target_intensity),
+                }
+            )
+            # Coordinate, unit, and acquisition tokens are intentionally part
+            # of the shared encoder, but they otherwise make the JEPA target
+            # predictable without looking at the spectrum.  Predict the latent
+            # change caused by intensity so a metadata-only solution has loss 2.
+            target_patches = target.patches - metadata_only.patches
         prediction = self.predictor(online.patches)
-        return masked_latent_loss(prediction, target.patches, mask), online, mask
+        residual_norm = target_patches[mask].norm(dim=-1).mean()
+        return (
+            masked_latent_loss(prediction, target_patches, mask),
+            online,
+            mask,
+            residual_norm,
+        )
 
     def forward(
         self, first: Mapping[str, torch.Tensor], second: Mapping[str, torch.Tensor]
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        first_jepa, first_embedding, first_mask = self._side(first)
-        second_jepa, second_embedding, second_mask = self._side(second)
+        first_jepa, first_embedding, first_mask, first_residual_norm = self._side(
+            first
+        )
+        second_jepa, second_embedding, second_mask, second_residual_norm = self._side(
+            second
+        )
         jepa = 0.5 * (first_jepa + second_jepa)
         alignment = symmetric_alignment_loss(
             first_embedding.aligned,
@@ -107,12 +135,27 @@ class JEPAExperiment(nn.Module):
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
+        aligned_combined = torch.cat(
+            (first_embedding.aligned, second_embedding.aligned), dim=0
+        )
+        aligned_diagnostics = embedding_diagnostics(
+            aligned_combined,
+            min_std=self.config.collapse_min_std,
+            min_effective_rank=self.config.collapse_min_rank,
+        )
         if diagnostics.collapsed:
             variance = variance_regularization(combined)
             covariance = covariance_regularization(combined)
         else:
             variance = combined.new_zeros(())
             covariance = combined.new_zeros(())
+        if aligned_diagnostics.collapsed:
+            # Unit-normalized 256-D projections have a healthy per-feature
+            # standard deviation near 1/sqrt(256), so use a compatible floor.
+            variance = variance + variance_regularization(
+                aligned_combined, target_std=0.04
+            )
+            covariance = covariance + covariance_regularization(aligned_combined)
         total = (
             jepa
             + self.config.alignment_weight * alignment
@@ -126,9 +169,14 @@ class JEPAExperiment(nn.Module):
             "covariance_loss": float(covariance.detach()),
             "embedding_std": diagnostics.mean_feature_std,
             "effective_rank": diagnostics.effective_rank,
-            "collapsed": float(diagnostics.collapsed),
+            "aligned_embedding_std": aligned_diagnostics.mean_feature_std,
+            "aligned_effective_rank": aligned_diagnostics.effective_rank,
+            "collapsed": float(diagnostics.collapsed or aligned_diagnostics.collapsed),
             "masked_fraction": float(
                 torch.cat((first_mask.flatten(), second_mask.flatten())).float().mean()
+            ),
+            "target_signal_residual_norm": float(
+                0.5 * (first_residual_norm + second_residual_norm)
             ),
         }
         return total, metrics
