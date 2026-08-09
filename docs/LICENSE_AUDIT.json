@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "approved_at": "2026-08-09",
+  "approval_basis": "The project owner explicitly approved all four source entries for the uses recorded below.",
+  "sources": [
+    {
+      "id": "multimodal-spectroscopic-dataset",
+      "name": "NeurIPS 2024 Multimodal Spectroscopic Dataset",
+      "url": "https://doi.org/10.5281/zenodo.11611178",
+      "status": "approved_for_training",
+      "license": "Release terms accepted by the project owner for research training; the repository code license is not treated as the dataset license",
+      "record_level_license": false,
+      "redistribution": "No source or derived spectra will be redistributed without a separate terms review",
+      "checked_at": "2026-08-09",
+      "notes": "Approved for pretraining and evaluation in this project. Preserve release identifiers and hashes in every dataset manifest."
+    },
+    {
+      "id": "specteach",
+      "name": "Spectroscopy Data for Undergraduate Teaching",
+      "url": "https://doi.org/10.1021/acs.jchemed.3c00046",
+      "status": "approved_for_evaluation",
+      "license": "CC BY 4.0 approval recorded for the article and accompanying evaluation files",
+      "record_level_license": false,
+      "redistribution": "Attribution required; redistribution is outside the current project scope",
+      "checked_at": "2026-08-09",
+      "notes": "Approved for experimental evaluation, exact-molecule exclusion, and scaffold-exclusion analysis."
+    },
+    {
+      "id": "nmrshiftdb2",
+      "name": "nmrshiftdb2",
+      "url": "https://nmrshiftdb.nmr.uni-koeln.de/",
+      "status": "approved_for_evaluation",
+      "license": "Extended ODC Open Database License terms accepted by the project owner for evaluation",
+      "record_level_license": false,
+      "redistribution": "No database dump or derived database will be redistributed by this project",
+      "checked_at": "2026-08-09",
+      "notes": "Evaluation is limited to measured spectra with usable structures and metadata; keep the database-data license distinct from the software license."
+    },
+    {
+      "id": "massbank",
+      "name": "MassBank open data",
+      "url": "https://github.com/MassBank/MassBank-data",
+      "status": "approved_for_evaluation",
+      "license": "License is carried by individual MassBank records",
+      "record_level_license": true,
+      "redistribution": "Record-level license filter and attribution remain mandatory",
+      "checked_at": "2026-08-09",
+      "notes": "Approved for evaluation only after retaining records whose LICENSE field permits the intended use; the project-level approval does not override a record license."
+    }
+  ]
+}

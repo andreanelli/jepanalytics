@@ -1,0 +1,13 @@
+{
+  "data_root": "data/processed/pilot",
+  "output_dir": "runs/leave-out-nmr",
+  "objective": "jepa",
+  "epochs": 20,
+  "batch_size": 32,
+  "mask_ratio": 0.5,
+  "alignment_weight": 0.05,
+  "excluded_acquisitions": [1, 2],
+  "seed": 17,
+  "encoder": {"n_bins": 4096, "patch_size": 32, "hidden_dim": 384, "depth": 12, "heads": 6, "aligned_dim": 256}
+}
+

@@ -1,0 +1,29 @@
+{
+  "data_root": "data/processed/smoke",
+  "output_dir": "runs/smoke",
+  "objective": "jepa",
+  "epochs": 2,
+  "batch_size": 8,
+  "learning_rate": 0.001,
+  "weight_decay": 0.01,
+  "mask_ratio": 0.5,
+  "alignment_weight": 0.05,
+  "ema_decay": 0.98,
+  "variance_weight": 0.1,
+  "collapse_min_rank": 2.0,
+  "seed": 17,
+  "device": "cpu",
+  "log_every": 1,
+  "encoder": {
+    "n_bins": 256,
+    "patch_size": 16,
+    "hidden_dim": 64,
+    "depth": 2,
+    "heads": 4,
+    "mlp_ratio": 2.0,
+    "aligned_dim": 32,
+    "continuous_metadata_dim": 10,
+    "dropout": 0.0
+  }
+}
+
