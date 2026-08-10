@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .data import CanonicalSpectraDataset
-from .manifest import write_json_atomic
+from .manifest import sha256_file, write_json_atomic
 from .metrics import macro_auprc, macro_f1
 from .model import UniversalSpectrumEncoder, batch_to_encoder_kwargs
 from .training import load_encoder_checkpoint, move_batch, resolve_device, seed_everything
@@ -69,6 +69,84 @@ def extract_embeddings(
     return result
 
 
+def build_embedding_cache(
+    checkpoint: str | Path,
+    data_root: str | Path,
+    output: str | Path,
+    *,
+    splits: Sequence[str] = ("train", "test"),
+    batch_size: int = 256,
+    device: str = "auto",
+) -> Path:
+    """Encode each requested split once and persist validated NumPy arrays."""
+
+    checkpoint = Path(checkpoint)
+    data_root = Path(data_root)
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    target_device = resolve_device(device)
+    encoder = load_encoder_checkpoint(checkpoint, target_device)
+    manifest: dict[str, Any] = {
+        "format_version": 1,
+        "checkpoint": str(checkpoint.resolve()),
+        "checkpoint_sha256": sha256_file(checkpoint),
+        "dataset_manifest": str((data_root / "manifest.json").resolve()),
+        "dataset_manifest_sha256": sha256_file(data_root / "manifest.json"),
+        "splits": {},
+    }
+    for split in splits:
+        encoded = extract_embeddings(
+            encoder,
+            CanonicalSpectraDataset(data_root, split),
+            batch_size=batch_size,
+            device=target_device,
+        )
+        split_root = output / split
+        split_root.mkdir(parents=True, exist_ok=True)
+        arrays = {}
+        for name, values in encoded.items():
+            path = split_root / f"{name}.npy"
+            np.save(path, values, allow_pickle=False)
+            arrays[name] = {
+                "path": str(path.resolve()),
+                "sha256": sha256_file(path),
+                "shape": list(values.shape),
+                "dtype": str(values.dtype),
+            }
+        manifest["splits"][split] = {
+            "n_records": int(encoded["record_index"].size),
+            "arrays": arrays,
+        }
+    manifest_path = output / "manifest.json"
+    write_json_atomic(manifest, manifest_path)
+    return manifest_path
+
+
+def load_embedding_cache(
+    root: str | Path,
+    split: str,
+    *,
+    checkpoint: str | Path,
+    data_root: str | Path,
+) -> dict[str, np.ndarray]:
+    """Load a cache only after its model and dataset provenance match."""
+
+    root = Path(root)
+    manifest = json.loads((root / "manifest.json").read_text())
+    if manifest["checkpoint_sha256"] != sha256_file(checkpoint):
+        raise ValueError("embedding cache checkpoint hash does not match")
+    if manifest["dataset_manifest_sha256"] != sha256_file(
+        Path(data_root) / "manifest.json"
+    ):
+        raise ValueError("embedding cache dataset hash does not match")
+    if split not in manifest["splits"]:
+        raise ValueError(f"embedding cache does not contain split {split!r}")
+    return {
+        name: np.load(root / split / f"{name}.npy", mmap_mode="r")
+        for name in manifest["splits"][split]["arrays"]
+    }
+
+
 def _sample_molecules(molecules: np.ndarray, fraction: float, seed: int) -> np.ndarray:
     unique = np.unique(molecules)
     count = max(1, round(unique.size * fraction))
@@ -117,13 +195,26 @@ def evaluate_few_shot_probes(
     probe_epochs: int = 150,
     batch_size: int = 64,
     device: str = "auto",
+    embedding_cache: str | Path | None = None,
 ) -> dict[str, Any]:
     target_device = resolve_device(device)
-    encoder = load_encoder_checkpoint(checkpoint, target_device)
-    train_dataset = CanonicalSpectraDataset(data_root, split="train")
-    test_dataset = CanonicalSpectraDataset(data_root, split="test")
-    train = extract_embeddings(encoder, train_dataset, batch_size=batch_size, device=target_device)
-    test = extract_embeddings(encoder, test_dataset, batch_size=batch_size, device=target_device)
+    if embedding_cache:
+        train = load_embedding_cache(
+            embedding_cache, "train", checkpoint=checkpoint, data_root=data_root
+        )
+        test = load_embedding_cache(
+            embedding_cache, "test", checkpoint=checkpoint, data_root=data_root
+        )
+    else:
+        encoder = load_encoder_checkpoint(checkpoint, target_device)
+        train_dataset = CanonicalSpectraDataset(data_root, split="train")
+        test_dataset = CanonicalSpectraDataset(data_root, split="test")
+        train = extract_embeddings(
+            encoder, train_dataset, batch_size=batch_size, device=target_device
+        )
+        test = extract_embeddings(
+            encoder, test_dataset, batch_size=batch_size, device=target_device
+        )
     if "labels" not in train or "labels" not in test:
         raise ValueError("functional-group evaluation requires labels in the canonical store")
     results: list[dict[str, Any]] = []
@@ -180,11 +271,19 @@ def evaluate_cross_modal_retrieval(
     max_per_acquisition: int = 5000,
     batch_size: int = 64,
     device: str = "auto",
+    embedding_cache: str | Path | None = None,
 ) -> dict[str, Any]:
     target_device = resolve_device(device)
-    encoder = load_encoder_checkpoint(checkpoint, target_device)
-    dataset = CanonicalSpectraDataset(data_root, split=split)
-    encoded = extract_embeddings(encoder, dataset, batch_size=batch_size, device=target_device)
+    if embedding_cache:
+        encoded = load_embedding_cache(
+            embedding_cache, split, checkpoint=checkpoint, data_root=data_root
+        )
+    else:
+        encoder = load_encoder_checkpoint(checkpoint, target_device)
+        dataset = CanonicalSpectraDataset(data_root, split=split)
+        encoded = extract_embeddings(
+            encoder, dataset, batch_size=batch_size, device=target_device
+        )
     reports = []
     acquisitions = sorted(np.unique(encoded["acquisition"]).tolist())
     for source in acquisitions:
@@ -228,15 +327,24 @@ def evaluate_modality_shortcut(
     representation: str = "general",
     epochs: int = 100,
     device: str = "auto",
+    embedding_cache: str | Path | None = None,
 ) -> dict[str, Any]:
     target_device = resolve_device(device)
-    encoder = load_encoder_checkpoint(checkpoint, target_device)
-    train = extract_embeddings(
-        encoder, CanonicalSpectraDataset(data_root, "train"), device=target_device
-    )
-    test = extract_embeddings(
-        encoder, CanonicalSpectraDataset(data_root, "test"), device=target_device
-    )
+    if embedding_cache:
+        train = load_embedding_cache(
+            embedding_cache, "train", checkpoint=checkpoint, data_root=data_root
+        )
+        test = load_embedding_cache(
+            embedding_cache, "test", checkpoint=checkpoint, data_root=data_root
+        )
+    else:
+        encoder = load_encoder_checkpoint(checkpoint, target_device)
+        train = extract_embeddings(
+            encoder, CanonicalSpectraDataset(data_root, "train"), device=target_device
+        )
+        test = extract_embeddings(
+            encoder, CanonicalSpectraDataset(data_root, "test"), device=target_device
+        )
     x = torch.tensor(train[representation], dtype=torch.float32, device=target_device)
     y = torch.tensor(train["acquisition"], dtype=torch.long, device=target_device)
     model = nn.Linear(x.shape[1], 5).to(target_device)

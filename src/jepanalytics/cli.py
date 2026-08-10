@@ -15,6 +15,7 @@ from .baselines import external_baseline_status
 from .config import load_training_config
 from .data import build_jsonl_store, build_synthetic_store, verify_canonical_store
 from .evaluation import (
+    build_embedding_cache,
     evaluate_cross_modal_retrieval,
     evaluate_few_shot_probes,
     evaluate_modality_shortcut,
@@ -73,6 +74,15 @@ def build_parser() -> argparse.ArgumentParser:
     pretrain.add_argument("--config", required=True)
     pretrain.add_argument("--resume", help="checkpoint to resume without editing the config")
 
+    embed = subcommands.add_parser(
+        "embed", help="cache frozen embeddings for repeated evaluations"
+    )
+    embed.add_argument("--checkpoint", required=True)
+    embed.add_argument("--data", required=True)
+    embed.add_argument("--output", required=True)
+    embed.add_argument("--device", default="auto")
+    embed.add_argument("--batch-size", type=int, default=256)
+
     inspect_model = subcommands.add_parser("inspect-model", help="report model parameter counts")
     inspect_model.add_argument("--config", help="training config; defaults to the full encoder")
 
@@ -91,6 +101,8 @@ def build_parser() -> argparse.ArgumentParser:
         current.add_argument("--output", required=True)
         current.add_argument("--device", default="auto")
     evaluate_sub.choices["probes"].add_argument("--probe-epochs", type=int, default=150)
+    for name in ("probes", "retrieval", "shortcut"):
+        evaluate_sub.choices[name].add_argument("--embeddings")
     evaluate_sub.choices["retrieval"].add_argument("--split", default="test")
     evaluate_sub.choices["shortcut"].add_argument(
         "--representation", choices=("general", "aligned"), default="general"
@@ -159,6 +171,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         checkpoint = train(config)
         _print({"checkpoint": str(checkpoint.resolve())})
         return 0
+    if args.command == "embed":
+        manifest = build_embedding_cache(
+            args.checkpoint,
+            args.data,
+            args.output,
+            batch_size=args.batch_size,
+            device=args.device,
+        )
+        _print({"manifest": str(manifest.resolve())})
+        return 0
     if args.command in {"inspect-model", "init-random-checkpoint"}:
         config = load_training_config(args.config).encoder if args.config else EncoderConfig()
         model = UniversalSpectrumEncoder(config)
@@ -194,10 +216,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.data,
                 probe_epochs=args.probe_epochs,
                 device=args.device,
+                embedding_cache=args.embeddings,
             )
         elif args.evaluation == "retrieval":
             result = evaluate_cross_modal_retrieval(
-                args.checkpoint, args.data, split=args.split, device=args.device
+                args.checkpoint,
+                args.data,
+                split=args.split,
+                device=args.device,
+                embedding_cache=args.embeddings,
             )
         elif args.evaluation == "shortcut":
             result = evaluate_modality_shortcut(
@@ -205,6 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.data,
                 representation=args.representation,
                 device=args.device,
+                embedding_cache=args.embeddings,
             )
         else:
             result = evaluate_robustness(
