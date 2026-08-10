@@ -2,10 +2,17 @@ import numpy as np
 import torch
 
 from jepanalytics.losses import (
+    alignment_diagnostics,
     covariance_regularization,
     embedding_diagnostics,
+    group_centroid_regularization,
     masked_latent_loss,
+    modality_centroid_alignment_loss,
+    multi_positive_alignment_loss,
+    multiview_alignment_diagnostics,
+    pairwise_multiview_alignment_diagnostics,
     symmetric_alignment_loss,
+    symmetric_multi_positive_alignment_loss,
 )
 from jepanalytics.masking import mixed_patch_mask
 from jepanalytics.model import EncoderConfig, UniversalSpectrumEncoder
@@ -95,6 +102,73 @@ def test_covariance_regularization_detects_collinear_nonconstant_features():
     assert collinear_loss > 10 * independent_loss
     collinear_loss.backward()
     assert torch.isfinite(collinear.grad).all()
+
+
+def test_multi_positive_alignment_treats_replicates_as_positives():
+    first = torch.tensor([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    second = torch.tensor([[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
+    first_molecule = torch.tensor([0, 0, 1])
+    second_molecule = torch.tensor([0, 1, 1])
+    good = symmetric_multi_positive_alignment_loss(
+        first, second, first_molecule, second_molecule
+    )
+    bad = symmetric_multi_positive_alignment_loss(
+        first.flip(0), second, first_molecule, second_molecule
+    )
+    assert good < bad
+    diagnostics = alignment_diagnostics(
+        first, second, first_molecule, second_molecule
+    )
+    assert diagnostics["alignment_positives_per_anchor"] > 1
+    assert diagnostics["alignment_cosine_margin"] > 0
+
+
+def test_group_centroid_regularization_detects_common_direction():
+    collapsed = torch.tensor([[1.0, 0.0]]).repeat(8, 1)
+    spread = torch.tensor(
+        [[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0]]
+    ).repeat(2, 1)
+    groups = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1])
+    assert group_centroid_regularization(collapsed, groups) > 5 * group_centroid_regularization(
+        spread, groups
+    )
+
+
+def test_multiview_alignment_uses_every_other_view_as_a_positive():
+    embedding = torch.tensor(
+        [
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+        ]
+    )
+    molecule = torch.tensor([0, 0, 0, 1, 1, 1])
+    assert multi_positive_alignment_loss(embedding, molecule) < 1e-3
+    diagnostics = multiview_alignment_diagnostics(embedding, molecule)
+    assert diagnostics["alignment_batch_top1"] == 1.0
+    assert diagnostics["alignment_positives_per_anchor"] == 2.0
+    acquisition = torch.tensor([0, 1, 2, 0, 1, 2])
+    pairwise = pairwise_multiview_alignment_diagnostics(
+        embedding, molecule, acquisition
+    )
+    assert pairwise["alignment_pair_0_1_recall_at_1"] == 1.0
+    assert pairwise["alignment_pair_0_2_cosine_margin"] > 0
+
+
+def test_modality_centroid_loss_detects_technique_prototypes():
+    acquisition = torch.tensor([0, 0, 1, 1])
+    separated = torch.tensor(
+        [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]
+    )
+    mixed = torch.tensor(
+        [[1.0, 0.0], [0.0, 1.0], [1.0, 0.0], [0.0, 1.0]]
+    )
+    assert modality_centroid_alignment_loss(
+        separated, acquisition
+    ) > modality_centroid_alignment_loss(mixed, acquisition)
 
 
 def test_default_encoder_parameter_count_matches_preregistered_range():

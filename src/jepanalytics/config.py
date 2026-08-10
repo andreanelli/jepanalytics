@@ -20,11 +20,15 @@ class TrainingConfig:
     objective: str = "jepa"
     epochs: int = 20
     batch_size: int = 32
+    views_per_molecule: int = 2
     learning_rate: float = 3e-4
     weight_decay: float = 0.05
     mask_ratio: float = 0.50
     alignment_weight: float = 0.05
     alignment_temperature: float = 0.07
+    alignment_clean_view: bool = True
+    alignment_uniformity_weight: float = 0.10
+    alignment_target_std: float = 0.04
     ema_decay: float = 0.996
     variance_weight: float = 0.10
     collapse_min_std: float = 0.02
@@ -52,6 +56,16 @@ class TrainingConfig:
             raise ValueError("objective must be 'jepa' or 'mae'")
         if self.alignment_weight not in {0.0, 0.05, 0.2}:
             raise ValueError("alignment_weight must be one of 0, 0.05, or 0.2")
+        if self.alignment_temperature <= 0:
+            raise ValueError("alignment_temperature must be positive")
+        if not 2 <= self.views_per_molecule <= 5:
+            raise ValueError("views_per_molecule must be between 2 and 5")
+        if self.objective == "mae" and self.views_per_molecule != 2:
+            raise ValueError("masked-autoencoder controls require two views per molecule")
+        if self.alignment_uniformity_weight < 0:
+            raise ValueError("alignment_uniformity_weight cannot be negative")
+        if self.alignment_target_std <= 0:
+            raise ValueError("alignment_target_std must be positive")
         if not 0.4 <= self.mask_ratio <= 0.6:
             raise ValueError("mask_ratio must remain in the preregistered 40-60% interval")
         if self.wandb_mode not in {"online", "offline", "disabled"}:

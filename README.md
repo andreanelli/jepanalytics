@@ -18,7 +18,8 @@ third-party spectral data is bundled or downloaded automatically.
 - One shared 20–25M parameter encoder with general, aligned, and patch-level
   embeddings.
 - EMA target JEPA training with mixed contiguous, random, and peak-centered
-  masks; symmetric cross-modal alignment; collapse monitoring.
+  masks; balanced multi-view, multi-positive cross-modal alignment; collapse and
+  modality-shortcut monitoring.
 - A raw-intensity masked-autoencoder control using the identical backbone.
 - Memory-mappable canonical data stores with hashes and automatic molecule,
   scaffold, replicate, and acquisition leakage checks.
@@ -56,6 +57,12 @@ On an Apple Silicon machine with Metal available, use
 `configs/pilot-mps.json`. Its batch size of 64 was selected by the checked M4
 Max calibration; `configs/mps-calibration.json` reproduces the compatibility
 and throughput check before a long run.
+
+The post-failure alignment repair is configured separately in
+`configs/pilot-multiview-mps.json`. It uses five simultaneous acquisition views,
+24 molecules per MPS batch, and eight epochs so the total number of processed
+spectra remains comparable to the original 20-epoch two-view pilot. Run
+`configs/mps-multiview-calibration.json` first on new hardware.
 
 ## Public API
 

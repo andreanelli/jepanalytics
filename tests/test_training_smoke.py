@@ -4,11 +4,29 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from jepanalytics.augment import AugmentationConfig
 from jepanalytics.config import TrainingConfig
-from jepanalytics.data import build_synthetic_store
-from jepanalytics.model import EncoderConfig
+from jepanalytics.data import (
+    CanonicalSpectraDataset,
+    MultiViewSpectrumDataset,
+    build_synthetic_store,
+    multiview_collate,
+)
+from jepanalytics.losses import (
+    covariance_regularization,
+    group_centroid_regularization,
+    modality_centroid_alignment_loss,
+    multi_positive_alignment_loss,
+    multiview_alignment_diagnostics,
+    variance_regularization,
+)
+from jepanalytics.model import (
+    EncoderConfig,
+    UniversalSpectrumEncoder,
+    batch_to_encoder_kwargs,
+)
 from jepanalytics.training import _restore_rng_state, train
 
 
@@ -109,3 +127,108 @@ def test_mps_rng_restore_moves_checkpoint_state_to_cpu(monkeypatch):
         torch.device("mps"),
     )
     assert restored == [cpu_state]
+
+
+def test_multiview_alignment_overfits_known_pairs_and_retrieves_in_eval_mode(
+    tmp_path: Path,
+):
+    data = tmp_path / "alignment-data"
+    build_synthetic_store(
+        data, n_molecules=24, n_bins=128, n_labels=32, seed=17
+    )
+    base = CanonicalSpectraDataset(data, "train")
+    samples = MultiViewSpectrumDataset(
+        base, views_per_molecule=5, seed=17
+    )
+    batch = next(
+        iter(
+            DataLoader(
+                samples,
+                batch_size=len(samples),
+                shuffle=False,
+                collate_fn=multiview_collate,
+            )
+        )
+    )
+    torch.manual_seed(17)
+    model = UniversalSpectrumEncoder(
+        EncoderConfig(
+            n_bins=128,
+            patch_size=8,
+            hidden_dim=64,
+            depth=2,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=32,
+        )
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    for _ in range(110):
+        output = model(**batch_to_encoder_kwargs(batch))
+        aligned = model.normalize_alignment_logits(
+            output.alignment_logits, update_stats=True
+        )
+        alignment = multi_positive_alignment_loss(
+            aligned, batch["molecule_index"], temperature=0.1
+        )
+        regularization = (
+            variance_regularization(aligned, target_std=0.1)
+            + covariance_regularization(aligned)
+            + group_centroid_regularization(aligned, batch["acquisition"])
+            + modality_centroid_alignment_loss(
+                aligned, batch["acquisition"]
+            )
+        )
+        optimizer.zero_grad(set_to_none=True)
+        (alignment + 0.1 * regularization).backward()
+        optimizer.step()
+
+    model.eval()
+    with torch.inference_mode():
+        aligned = model(**batch_to_encoder_kwargs(batch)).aligned
+    diagnostics = multiview_alignment_diagnostics(
+        aligned, batch["molecule_index"]
+    )
+    assert diagnostics["alignment_batch_top1"] > 0.95
+    assert diagnostics["alignment_cosine_margin"] > 0.25
+
+
+def test_multiview_jepa_training_logs_balanced_positive_pairs(tmp_path: Path):
+    data = tmp_path / "multiview-data"
+    run = tmp_path / "multiview-run"
+    build_synthetic_store(data, n_molecules=24, n_bins=64, n_labels=8, seed=8)
+    config = TrainingConfig(
+        data_root=str(data),
+        output_dir=str(run),
+        encoder=EncoderConfig(
+            n_bins=64,
+            patch_size=8,
+            hidden_dim=32,
+            depth=1,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=16,
+        ),
+        epochs=1,
+        batch_size=4,
+        views_per_molecule=5,
+        learning_rate=0.001,
+        alignment_weight=0.2,
+        collapse_min_rank=1.0,
+        device="cpu",
+        log_every=1,
+    )
+    checkpoint = train(config, repository=tmp_path)
+    assert checkpoint.exists()
+    rows = [
+        json.loads(line)
+        for line in (run / "metrics.jsonl").read_text().splitlines()
+    ]
+    assert rows
+    assert all(row["alignment_positives_per_anchor"] == 4.0 for row in rows)
+    for first in range(5):
+        for second in range(first + 1, 5):
+            assert all(
+                abs(row[f"pair_fraction_{first}_{second}"] - 0.1) < 1e-6
+                for row in rows
+            )

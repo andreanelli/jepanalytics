@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import math
 import random
@@ -205,16 +206,34 @@ class CanonicalSpectraDataset(Dataset[dict[str, torch.Tensor]]):
 
 
 class PairedSpectrumDataset(Dataset[tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]]):
-    """Choose two acquisitions from one molecule, varying the choice by epoch."""
+    """Choose a balanced acquisition pair from one molecule per epoch.
+
+    The canonical NeurIPS store has three records per MS/MS family and one per
+    IR/NMR family. Sampling records directly therefore makes MS+/MS- pairs about
+    twelve times more common than IR/H1 pairs. Pair families first, then sample
+    one record within each selected family so collision energies do not distort
+    the cross-technique objective.
+    """
 
     def __init__(self, base: CanonicalSpectraDataset, seed: int = 17) -> None:
         self.base = base
         self.seed = seed
         self.epoch = 0
-        grouped: dict[int, list[int]] = defaultdict(list)
+        grouped: dict[int, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
         for local_index, row in enumerate(base.indices):
-            grouped[int(base.arrays["molecule_index"][row])].append(local_index)
-        self.groups = list(grouped.values())
+            molecule = int(base.arrays["molecule_index"][row])
+            acquisition = int(base.arrays["acquisition"][row])
+            grouped[molecule][acquisition].append(local_index)
+        self.groups = [dict(families) for families in grouped.values()]
+        self.pair_schedules: list[list[tuple[int, int]]] = []
+        for families in self.groups:
+            acquisitions = sorted(families)
+            if len(acquisitions) == 1:
+                pairs = [(acquisitions[0], acquisitions[0])]
+            else:
+                pairs = list(itertools.combinations(acquisitions, 2))
+                random.Random(self.seed).shuffle(pairs)
+            self.pair_schedules.append(pairs)
 
     def set_epoch(self, epoch: int) -> None:
         self.epoch = epoch
@@ -223,17 +242,76 @@ class PairedSpectrumDataset(Dataset[tuple[dict[str, torch.Tensor], dict[str, tor
         return len(self.groups)
 
     def __getitem__(self, index: int) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
-        choices = self.groups[index]
-        rng = random.Random(self.seed + self.epoch * len(self.groups) + index)
-        first = rng.choice(choices)
-        first_acquisition = int(self.base.arrays["acquisition"][self.base.indices[first]])
-        alternatives = [
-            candidate
-            for candidate in choices
-            if int(self.base.arrays["acquisition"][self.base.indices[candidate]]) != first_acquisition
-        ]
-        second = rng.choice(alternatives or choices)
+        families = self.groups[index]
+        schedule = self.pair_schedules[index]
+        first_acquisition, second_acquisition = schedule[(index + self.epoch) % len(schedule)]
+        rng = random.Random(
+            self.seed + self.epoch * len(self.groups) + index * 9973
+        )
+        if first_acquisition != second_acquisition and rng.random() < 0.5:
+            first_acquisition, second_acquisition = (
+                second_acquisition,
+                first_acquisition,
+            )
+        first = rng.choice(families[first_acquisition])
+        second_choices = families[second_acquisition]
+        if first_acquisition == second_acquisition and len(second_choices) > 1:
+            second = rng.choice([candidate for candidate in second_choices if candidate != first])
+        else:
+            second = rng.choice(second_choices)
         return self.base[first], self.base[second]
+
+
+class MultiViewSpectrumDataset(Dataset[list[dict[str, torch.Tensor]]]):
+    """Sample one record from each requested acquisition family per molecule."""
+
+    def __init__(
+        self,
+        base: CanonicalSpectraDataset,
+        *,
+        views_per_molecule: int,
+        seed: int = 17,
+    ) -> None:
+        if views_per_molecule < 2:
+            raise ValueError("multi-view sampling requires at least two views")
+        self.base = base
+        self.views_per_molecule = views_per_molecule
+        self.seed = seed
+        self.epoch = 0
+        grouped: dict[int, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
+        for local_index, row in enumerate(base.indices):
+            molecule = int(base.arrays["molecule_index"][row])
+            acquisition = int(base.arrays["acquisition"][row])
+            grouped[molecule][acquisition].append(local_index)
+        self.groups = [
+            dict(families)
+            for families in grouped.values()
+            if len(families) >= views_per_molecule
+        ]
+        if not self.groups:
+            raise ValueError("no molecule has enough acquisition families for multi-view training")
+        self.view_schedules = []
+        for families in self.groups:
+            schedules = list(
+                itertools.combinations(sorted(families), views_per_molecule)
+            )
+            random.Random(seed).shuffle(schedules)
+            self.view_schedules.append(schedules)
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = epoch
+
+    def __len__(self) -> int:
+        return len(self.groups)
+
+    def __getitem__(self, index: int) -> list[dict[str, torch.Tensor]]:
+        families = self.groups[index]
+        schedules = self.view_schedules[index]
+        acquisitions = schedules[(index + self.epoch) % len(schedules)]
+        rng = random.Random(
+            self.seed + self.epoch * len(self.groups) + index * 9973
+        )
+        return [self.base[rng.choice(families[acquisition])] for acquisition in acquisitions]
 
 
 def paired_collate(
@@ -244,6 +322,14 @@ def paired_collate(
         return {key: torch.stack([sample[side][key] for sample in samples]) for key in keys}
 
     return stack(0), stack(1)
+
+
+def multiview_collate(
+    samples: Sequence[list[dict[str, torch.Tensor]]],
+) -> dict[str, torch.Tensor]:
+    flattened = [view for sample in samples for view in sample]
+    keys = flattened[0].keys()
+    return {key: torch.stack([view[key] for view in flattened]) for key in keys}
 
 
 def _gaussian_trace(axis: np.ndarray, peaks: Iterable[tuple[float, float, float]]) -> np.ndarray:

@@ -16,6 +16,15 @@ def _wandb_metrics(record: Mapping[str, Any]) -> dict[str, float]:
         "loss": "train/total_loss",
         "jepa_loss": "train/jepa_loss",
         "alignment_loss": "train/alignment_loss",
+        "alignment_positive_cosine": "alignment/positive_cosine",
+        "alignment_negative_cosine": "alignment/negative_cosine",
+        "alignment_cosine_margin": "alignment/cosine_margin",
+        "alignment_batch_top1": "alignment/batch_recall_at_1",
+        "alignment_centroid_norm": "alignment/centroid_norm",
+        "alignment_positives_per_anchor": "alignment/positives_per_anchor",
+        "alignment_uniformity_loss": "alignment/uniformity_loss",
+        "alignment_centroid_loss": "alignment/centroid_loss",
+        "alignment_modality_centroid_loss": "alignment/modality_centroid_loss",
         "reconstruction_loss": "train/reconstruction_loss",
         "variance_loss": "regularization/variance_loss",
         "covariance_loss": "regularization/covariance_loss",
@@ -30,6 +39,7 @@ def _wandb_metrics(record: Mapping[str, Any]) -> dict[str, float]:
         "gradient_norm": "optimization/gradient_norm",
         "step_seconds": "performance/step_seconds",
         "molecule_pairs_per_second": "performance/molecule_pairs_per_second",
+        "molecules_per_second": "performance/molecules_per_second",
         "spectra_per_second": "performance/spectra_per_second",
         "epoch_progress": "progress/epoch_fraction",
         "global_progress": "progress/run_fraction",
@@ -40,6 +50,22 @@ def _wandb_metrics(record: Mapping[str, Any]) -> dict[str, float]:
         for source, target in mapping.items()
         if source in record
     }
+    for first in range(5):
+        for second in range(first + 1, 5):
+            source = f"pair_fraction_{first}_{second}"
+            if source in record:
+                payload[f"data/pair_fraction_{first}_{second}"] = float(record[source])
+            prefix = f"alignment_pair_{first}_{second}"
+            for suffix, target in (
+                ("positive_cosine", "positive_cosine"),
+                ("cosine_margin", "cosine_margin"),
+                ("recall_at_1", "recall_at_1"),
+            ):
+                source = f"{prefix}_{suffix}"
+                if source in record:
+                    payload[
+                        f"alignment_pairs/{first}_{second}_{target}"
+                    ] = float(record[source])
     payload["trainer/epoch"] = float(record["epoch"])
     payload["trainer/global_step"] = float(record["step"])
     if "elapsed_seconds" in record:

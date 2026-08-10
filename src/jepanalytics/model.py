@@ -45,6 +45,7 @@ class EmbeddingBundle:
     general: torch.Tensor
     aligned: torch.Tensor
     patches: torch.Tensor
+    alignment_logits: torch.Tensor
 
 
 class UniversalSpectrumEncoder(nn.Module):
@@ -58,6 +59,14 @@ class UniversalSpectrumEncoder(nn.Module):
         self.learned_position = nn.Parameter(torch.zeros(1, cfg.n_patches, cfg.hidden_dim))
         self.mask_token = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
         self.summary_token = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
+        self.alignment_summary_token = nn.Parameter(
+            torch.zeros(1, 1, cfg.hidden_dim)
+        )
+        content_attention_mask = torch.zeros(cfg.n_patches + 2, cfg.n_patches + 2)
+        content_attention_mask[1:, 0] = -torch.inf
+        self.register_buffer(
+            "content_attention_mask", content_attention_mask, persistent=False
+        )
         self.axis_embedding = nn.Embedding(3, cfg.hidden_dim)
         self.unit_embedding = nn.Embedding(3, cfg.hidden_dim)
         self.acquisition_embedding = nn.Embedding(5, cfg.hidden_dim)
@@ -89,12 +98,19 @@ class UniversalSpectrumEncoder(nn.Module):
             nn.GELU(),
             nn.Linear(cfg.hidden_dim, cfg.aligned_dim),
         )
+        self.aligned_batch_norm = nn.BatchNorm1d(
+            cfg.aligned_dim, affine=False, momentum=0.05
+        )
+        # Parameter-free normalization keeps old checkpoints load-compatible
+        # while removing the easiest per-sample common-direction shortcut.
+        self.aligned_norm = nn.LayerNorm(cfg.aligned_dim, elementwise_affine=False)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         nn.init.trunc_normal_(self.learned_position, std=0.02)
         nn.init.trunc_normal_(self.mask_token, std=0.02)
         nn.init.trunc_normal_(self.summary_token, std=0.02)
+        nn.init.trunc_normal_(self.alignment_summary_token, std=0.02)
 
     def _coordinate_features(self, metadata: torch.Tensor) -> torch.Tensor:
         cfg = self.config
@@ -128,18 +144,57 @@ class UniversalSpectrumEncoder(nn.Module):
             + self.acquisition_embedding(acquisition)
         )
         tokens = tokens + self.learned_position + self._coordinate_features(continuous_metadata)
-        tokens = tokens + category.unsqueeze(1)
         if patch_mask is not None:
             if patch_mask.shape != tokens.shape[:2]:
                 raise ValueError("patch_mask must have shape [batch, patches]")
             tokens = torch.where(patch_mask.unsqueeze(-1), self.mask_token.expand_as(tokens), tokens)
         summary = self.summary_token.expand(intensity.shape[0], -1, -1)
         summary = summary + category.unsqueeze(1) + self.metadata_projection(continuous_metadata).unsqueeze(1)
-        encoded = self.output_norm(self.transformer(torch.cat((summary, tokens), dim=1)))
+        alignment_summary = self.alignment_summary_token.expand(
+            intensity.shape[0], -1, -1
+        )
+        sequence = torch.cat((summary, alignment_summary, tokens), dim=1)
+        # The general token may consume all content and metadata. Content and
+        # alignment tokens cannot attend back to the metadata-rich general
+        # token, preventing acquisition identity from becoming the easiest
+        # aligned representation while retaining one shared backbone.
+        encoded = self.output_norm(
+            self.transformer(
+                sequence, mask=self.content_attention_mask.to(dtype=sequence.dtype)
+            )
+        )
         general = encoded[:, 0]
-        patch_embeddings = encoded[:, 1:]
-        aligned = F.normalize(self.aligned_projection(general), dim=-1)
-        return EmbeddingBundle(general=general, aligned=aligned, patches=patch_embeddings)
+        alignment_content = encoded[:, 1]
+        patch_embeddings = encoded[:, 2:]
+        alignment_logits = self.aligned_projection(alignment_content)
+        aligned = self.normalize_alignment_logits(
+            alignment_logits, update_stats=False
+        )
+        return EmbeddingBundle(
+            general=general,
+            aligned=aligned,
+            patches=patch_embeddings,
+            alignment_logits=alignment_logits,
+        )
+
+    def normalize_alignment_logits(
+        self, alignment_logits: torch.Tensor, *, update_stats: bool
+    ) -> torch.Tensor:
+        """Center a balanced joint-view batch, or use its running statistics."""
+
+        alignment_logits = self.aligned_norm(alignment_logits)
+        if self.training and update_stats:
+            normalized = self.aligned_batch_norm(alignment_logits)
+        else:
+            normalized = F.batch_norm(
+                alignment_logits,
+                self.aligned_batch_norm.running_mean,
+                self.aligned_batch_norm.running_var,
+                training=False,
+                momentum=0.0,
+                eps=self.aligned_batch_norm.eps,
+            )
+        return F.normalize(normalized, dim=-1)
 
     @torch.inference_mode()
     def encode(

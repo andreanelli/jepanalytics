@@ -28,6 +28,196 @@ def symmetric_alignment_loss(
     return 0.5 * (F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels))
 
 
+def symmetric_multi_positive_alignment_loss(
+    first: torch.Tensor,
+    second: torch.Tensor,
+    first_molecule: torch.Tensor,
+    second_molecule: torch.Tensor,
+    temperature: float = 0.07,
+) -> torch.Tensor:
+    """Symmetric cross-view InfoNCE with every same-molecule record positive.
+
+    With one molecule per batch row this is equivalent to the original paired
+    cross-entropy. It remains correct if replicates, collision energies, or a
+    distributed sampler place multiple records of one molecule in a batch:
+    those records contribute to the numerator instead of becoming false
+    negatives.
+    """
+
+    if first.shape != second.shape or first.ndim != 2:
+        raise ValueError("paired embeddings must have matching [batch, dimension] shapes")
+    if first_molecule.shape != (first.shape[0],) or second_molecule.shape != (
+        second.shape[0],
+    ):
+        raise ValueError("molecule identifiers must have shape [batch]")
+    logits = F.normalize(first, dim=-1) @ F.normalize(second, dim=-1).T / temperature
+    positive = first_molecule[:, None] == second_molecule[None, :]
+    if not torch.all(positive.any(dim=1)) or not torch.all(positive.any(dim=0)):
+        raise ValueError("every alignment anchor must have a same-molecule positive")
+
+    def direction(values: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        numerator = torch.logsumexp(values.masked_fill(~mask, -torch.inf), dim=1)
+        denominator = torch.logsumexp(values, dim=1)
+        return (denominator - numerator).mean()
+
+    return 0.5 * (direction(logits, positive) + direction(logits.T, positive.T))
+
+
+def multi_positive_alignment_loss(
+    embedding: torch.Tensor,
+    molecule: torch.Tensor,
+    temperature: float = 0.07,
+) -> torch.Tensor:
+    """Multi-view InfoNCE with all other same-molecule views as positives."""
+
+    if embedding.ndim != 2 or molecule.shape != (embedding.shape[0],):
+        raise ValueError("embedding and molecule must have shapes [batch, dim] and [batch]")
+    count = embedding.shape[0]
+    valid = ~torch.eye(count, dtype=torch.bool, device=embedding.device)
+    positive = (molecule[:, None] == molecule[None, :]) & valid
+    if not torch.all(positive.any(dim=1)):
+        raise ValueError("every multi-view anchor must have another same-molecule view")
+    logits = F.normalize(embedding, dim=-1) @ F.normalize(embedding, dim=-1).T
+    logits = logits / temperature
+    numerator = torch.logsumexp(logits.masked_fill(~positive, -torch.inf), dim=1)
+    denominator = torch.logsumexp(logits.masked_fill(~valid, -torch.inf), dim=1)
+    return (denominator - numerator).mean()
+
+
+def group_centroid_regularization(
+    embedding: torch.Tensor, groups: torch.Tensor
+) -> torch.Tensor:
+    """Penalize dominant mean directions within every acquisition family."""
+
+    if embedding.ndim != 2 or groups.shape != (embedding.shape[0],):
+        raise ValueError("embedding and groups must have shapes [batch, dim] and [batch]")
+    normalized = F.normalize(embedding, dim=-1)
+    penalties = [
+        normalized[groups == group].mean(dim=0).square().sum()
+        for group in torch.unique(groups)
+    ]
+    return torch.stack(penalties).mean()
+
+
+def modality_centroid_alignment_loss(
+    embedding: torch.Tensor, acquisition: torch.Tensor
+) -> torch.Tensor:
+    """Remove separable acquisition offsets without forcing global collapse."""
+
+    if embedding.ndim != 2 or acquisition.shape != (embedding.shape[0],):
+        raise ValueError(
+            "embedding and acquisition must have shapes [batch, dim] and [batch]"
+        )
+    normalized = F.normalize(embedding, dim=-1)
+    centroids = torch.stack(
+        [
+            normalized[acquisition == family].mean(dim=0)
+            for family in torch.unique(acquisition)
+        ]
+    )
+    centered = centroids - centroids.mean(dim=0, keepdim=True)
+    return centered.square().sum(dim=1).mean()
+
+
+@torch.no_grad()
+def alignment_diagnostics(
+    first: torch.Tensor,
+    second: torch.Tensor,
+    first_molecule: torch.Tensor,
+    second_molecule: torch.Tensor,
+) -> dict[str, float]:
+    """Batch-level signal, anisotropy, and retrieval diagnostics."""
+
+    similarity = F.normalize(first.float(), dim=-1) @ F.normalize(
+        second.float(), dim=-1
+    ).T
+    positive = first_molecule[:, None] == second_molecule[None, :]
+    negative = ~positive
+    predicted = second_molecule[similarity.argmax(dim=1)]
+    combined = F.normalize(torch.cat((first.float(), second.float())), dim=-1)
+    positive_mean = similarity[positive].mean()
+    negative_mean = (
+        similarity[negative].mean()
+        if bool(negative.any())
+        else similarity.new_zeros(())
+    )
+    return {
+        "alignment_positive_cosine": float(positive_mean),
+        "alignment_negative_cosine": float(negative_mean),
+        "alignment_cosine_margin": float(positive_mean - negative_mean),
+        "alignment_batch_top1": float((predicted == first_molecule).float().mean()),
+        "alignment_centroid_norm": float(combined.mean(dim=0).norm()),
+        "alignment_positives_per_anchor": float(positive.float().sum(dim=1).mean()),
+    }
+
+
+@torch.no_grad()
+def multiview_alignment_diagnostics(
+    embedding: torch.Tensor, molecule: torch.Tensor
+) -> dict[str, float]:
+    """Alignment diagnostics for a joint batch with two or more views."""
+
+    normalized = F.normalize(embedding.float(), dim=-1)
+    similarity = normalized @ normalized.T
+    valid = ~torch.eye(embedding.shape[0], dtype=torch.bool, device=embedding.device)
+    positive = (molecule[:, None] == molecule[None, :]) & valid
+    negative = (molecule[:, None] != molecule[None, :]) & valid
+    ranking = similarity.masked_fill(~valid, -torch.inf).argmax(dim=1)
+    positive_mean = similarity[positive].mean()
+    negative_mean = similarity[negative].mean()
+    return {
+        "alignment_positive_cosine": float(positive_mean),
+        "alignment_negative_cosine": float(negative_mean),
+        "alignment_cosine_margin": float(positive_mean - negative_mean),
+        "alignment_batch_top1": float(
+            (molecule[ranking] == molecule).float().mean()
+        ),
+        "alignment_centroid_norm": float(normalized.mean(dim=0).norm()),
+        "alignment_positives_per_anchor": float(positive.float().sum(dim=1).mean()),
+    }
+
+
+@torch.no_grad()
+def pairwise_multiview_alignment_diagnostics(
+    embedding: torch.Tensor,
+    molecule: torch.Tensor,
+    acquisition: torch.Tensor,
+) -> dict[str, float]:
+    """Per-technique-pair margins and retrieval for W&B failure localization."""
+
+    normalized = F.normalize(embedding.float(), dim=-1)
+    metrics: dict[str, float] = {}
+    families = sorted(int(value) for value in torch.unique(acquisition).tolist())
+    for first_index, first_family in enumerate(families):
+        first = torch.nonzero(
+            acquisition == first_family, as_tuple=False
+        ).flatten()
+        for second_family in families[first_index + 1 :]:
+            second = torch.nonzero(
+                acquisition == second_family, as_tuple=False
+            ).flatten()
+            similarity = normalized[first] @ normalized[second].T
+            positive = molecule[first, None] == molecule[None, second]
+            negative = ~positive
+            prefix = f"alignment_pair_{first_family}_{second_family}"
+            positive_mean = similarity[positive].mean()
+            negative_mean = similarity[negative].mean()
+            forward_match = (
+                molecule[second[similarity.argmax(dim=1)]] == molecule[first]
+            ).float().mean()
+            reverse_match = (
+                molecule[first[similarity.argmax(dim=0)]] == molecule[second]
+            ).float().mean()
+            metrics[f"{prefix}_positive_cosine"] = float(positive_mean)
+            metrics[f"{prefix}_cosine_margin"] = float(
+                positive_mean - negative_mean
+            )
+            metrics[f"{prefix}_recall_at_1"] = float(
+                0.5 * (forward_match + reverse_match)
+            )
+    return metrics
+
+
 def variance_regularization(
     embedding: torch.Tensor, target_std: float = 0.1, epsilon: float = 1e-8
 ) -> torch.Tensor:

@@ -19,12 +19,24 @@ from torch.utils.data import DataLoader
 
 from .augment import SpectralAugmenter
 from .config import TrainingConfig, save_config
-from .data import CanonicalSpectraDataset, PairedSpectrumDataset, paired_collate
+from .data import (
+    CanonicalSpectraDataset,
+    MultiViewSpectrumDataset,
+    PairedSpectrumDataset,
+    multiview_collate,
+    paired_collate,
+)
 from .losses import (
+    alignment_diagnostics,
     covariance_regularization,
     embedding_diagnostics,
+    group_centroid_regularization,
     masked_latent_loss,
-    symmetric_alignment_loss,
+    modality_centroid_alignment_loss,
+    multi_positive_alignment_loss,
+    multiview_alignment_diagnostics,
+    pairwise_multiview_alignment_diagnostics,
+    symmetric_multi_positive_alignment_loss,
     variance_regularization,
 )
 from .manifest import build_run_manifest, sha256_file, write_json_atomic
@@ -79,15 +91,28 @@ class JEPAExperiment(nn.Module):
 
     def _side(
         self, batch: Mapping[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, Any, Any, torch.Tensor]:
+    ) -> tuple[torch.Tensor, Any, Any, torch.Tensor, torch.Tensor]:
         context = self.augment(batch["intensity"], light=False)
         target_intensity = self.augment(batch["intensity"], light=True)
         patches = context.unfold(
             1, self.config.encoder.patch_size, self.config.encoder.patch_size
         ).abs().amax(dim=-1)
         mask = mixed_patch_mask(patches, self.config.mask_ratio)
-        context_kwargs = {**batch_to_encoder_kwargs(batch), "intensity": context, "patch_mask": mask}
+        context_kwargs = {
+            **batch_to_encoder_kwargs(batch),
+            "intensity": context,
+            "patch_mask": mask,
+        }
         online = self.online(**context_kwargs)
+        if self.config.alignment_weight > 0 and self.config.alignment_clean_view:
+            alignment_embedding = self.online(
+                **{
+                    **batch_to_encoder_kwargs(batch),
+                    "intensity": target_intensity,
+                }
+            )
+        else:
+            alignment_embedding = online
         with torch.no_grad():
             target = self.target(
                 **{
@@ -111,6 +136,7 @@ class JEPAExperiment(nn.Module):
         return (
             masked_latent_loss(prediction, target_patches, mask),
             online,
+            alignment_embedding,
             mask,
             residual_norm,
         )
@@ -118,16 +144,37 @@ class JEPAExperiment(nn.Module):
     def forward(
         self, first: Mapping[str, torch.Tensor], second: Mapping[str, torch.Tensor]
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        first_jepa, first_embedding, first_mask, first_residual_norm = self._side(
-            first
-        )
-        second_jepa, second_embedding, second_mask, second_residual_norm = self._side(
-            second
-        )
+        (
+            first_jepa,
+            _first_context_embedding,
+            first_embedding,
+            first_mask,
+            first_residual_norm,
+        ) = self._side(first)
+        (
+            second_jepa,
+            _second_context_embedding,
+            second_embedding,
+            second_mask,
+            second_residual_norm,
+        ) = self._side(second)
         jepa = 0.5 * (first_jepa + second_jepa)
-        alignment = symmetric_alignment_loss(
-            first_embedding.aligned,
-            second_embedding.aligned,
+        joint_aligned = self.online.normalize_alignment_logits(
+            torch.cat(
+                (first_embedding.alignment_logits, second_embedding.alignment_logits),
+                dim=0,
+            ),
+            update_stats=True,
+        )
+        first_aligned, second_aligned = joint_aligned.split(
+            (first_embedding.aligned.shape[0], second_embedding.aligned.shape[0]),
+            dim=0,
+        )
+        alignment = symmetric_multi_positive_alignment_loss(
+            first_aligned,
+            second_aligned,
+            first["molecule_index"],
+            second["molecule_index"],
             self.config.alignment_temperature,
         )
         combined = torch.cat((first_embedding.general, second_embedding.general), dim=0)
@@ -136,38 +183,68 @@ class JEPAExperiment(nn.Module):
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
-        aligned_combined = torch.cat(
-            (first_embedding.aligned, second_embedding.aligned), dim=0
-        )
+        aligned_combined = joint_aligned
         aligned_diagnostics = embedding_diagnostics(
             aligned_combined,
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
         if diagnostics.collapsed:
-            variance = variance_regularization(combined)
-            covariance = covariance_regularization(combined)
+            general_variance = variance_regularization(combined)
+            general_covariance = covariance_regularization(combined)
         else:
-            variance = combined.new_zeros(())
-            covariance = combined.new_zeros(())
-        if aligned_diagnostics.collapsed:
-            # Unit-normalized 256-D projections have a healthy per-feature
-            # standard deviation near 1/sqrt(256), so use a compatible floor.
-            variance = variance + variance_regularization(
-                aligned_combined, target_std=0.04
+            general_variance = combined.new_zeros(())
+            general_covariance = combined.new_zeros(())
+        aligned_variance = aligned_combined.new_zeros(())
+        aligned_covariance = aligned_combined.new_zeros(())
+        alignment_centroid = aligned_combined.new_zeros(())
+        alignment_modality_centroid = aligned_combined.new_zeros(())
+        alignment_uniformity = aligned_combined.new_zeros(())
+        if self.config.alignment_weight > 0:
+            # A thresholded penalty let the first pilot settle exactly at the
+            # collapse boundary with a large common direction. Keep the aligned
+            # space spread and centered throughout training instead.
+            aligned_variance = variance_regularization(
+                aligned_combined, target_std=self.config.alignment_target_std
             )
-            covariance = covariance + covariance_regularization(aligned_combined)
+            aligned_covariance = covariance_regularization(aligned_combined)
+            alignment_centroid = group_centroid_regularization(
+                aligned_combined,
+                torch.cat((first["acquisition"], second["acquisition"])),
+            )
+            alignment_modality_centroid = modality_centroid_alignment_loss(
+                aligned_combined,
+                torch.cat((first["acquisition"], second["acquisition"])),
+            )
+            alignment_uniformity = (
+                aligned_variance
+                + aligned_covariance
+                + alignment_centroid
+                + alignment_modality_centroid
+            )
         total = (
             jepa
             + self.config.alignment_weight * alignment
-            + self.config.variance_weight * (variance + covariance)
+            + self.config.variance_weight * (general_variance + general_covariance)
+            + self.config.alignment_uniformity_weight * alignment_uniformity
+        )
+        alignment_metrics = alignment_diagnostics(
+            first_aligned,
+            second_aligned,
+            first["molecule_index"],
+            second["molecule_index"],
         )
         metrics = {
             "loss": float(total.detach()),
             "jepa_loss": float(jepa.detach()),
             "alignment_loss": float(alignment.detach()),
-            "variance_loss": float(variance.detach()),
-            "covariance_loss": float(covariance.detach()),
+            "variance_loss": float((general_variance + aligned_variance).detach()),
+            "covariance_loss": float((general_covariance + aligned_covariance).detach()),
+            "alignment_uniformity_loss": float(alignment_uniformity.detach()),
+            "alignment_centroid_loss": float(alignment_centroid.detach()),
+            "alignment_modality_centroid_loss": float(
+                alignment_modality_centroid.detach()
+            ),
             "embedding_std": diagnostics.mean_feature_std,
             "effective_rank": diagnostics.effective_rank,
             "aligned_embedding_std": aligned_diagnostics.mean_feature_std,
@@ -179,7 +256,130 @@ class JEPAExperiment(nn.Module):
             "target_signal_residual_norm": float(
                 0.5 * (first_residual_norm + second_residual_norm)
             ),
+            **alignment_metrics,
         }
+        pair_codes = torch.minimum(
+            first["acquisition"], second["acquisition"]
+        ) * 5 + torch.maximum(first["acquisition"], second["acquisition"])
+        for first_acquisition in range(5):
+            for second_acquisition in range(first_acquisition + 1, 5):
+                metrics[
+                    f"pair_fraction_{first_acquisition}_{second_acquisition}"
+                ] = float(
+                    (pair_codes == first_acquisition * 5 + second_acquisition)
+                    .float()
+                    .mean()
+                )
+        return total, metrics
+
+    def forward_multiview(
+        self, batch: Mapping[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        jepa, _context_embedding, embedding, mask, residual_norm = self._side(batch)
+        aligned = self.online.normalize_alignment_logits(
+            embedding.alignment_logits, update_stats=True
+        )
+        alignment = multi_positive_alignment_loss(
+            aligned,
+            batch["molecule_index"],
+            self.config.alignment_temperature,
+        )
+        general_diagnostics = embedding_diagnostics(
+            embedding.general,
+            min_std=self.config.collapse_min_std,
+            min_effective_rank=self.config.collapse_min_rank,
+        )
+        aligned_diagnostics = embedding_diagnostics(
+            aligned,
+            min_std=self.config.collapse_min_std,
+            min_effective_rank=self.config.collapse_min_rank,
+        )
+        if general_diagnostics.collapsed:
+            general_variance = variance_regularization(embedding.general)
+            general_covariance = covariance_regularization(embedding.general)
+        else:
+            general_variance = aligned.new_zeros(())
+            general_covariance = aligned.new_zeros(())
+        aligned_variance = variance_regularization(
+            aligned, target_std=self.config.alignment_target_std
+        )
+        aligned_covariance = covariance_regularization(aligned)
+        alignment_centroid = group_centroid_regularization(
+            aligned, batch["acquisition"]
+        )
+        alignment_modality_centroid = modality_centroid_alignment_loss(
+            aligned, batch["acquisition"]
+        )
+        alignment_uniformity = (
+            aligned_variance
+            + aligned_covariance
+            + alignment_centroid
+            + alignment_modality_centroid
+        )
+        total = (
+            jepa
+            + self.config.alignment_weight * alignment
+            + self.config.variance_weight * (general_variance + general_covariance)
+            + self.config.alignment_uniformity_weight * alignment_uniformity
+        )
+        metrics = {
+            "loss": float(total.detach()),
+            "jepa_loss": float(jepa.detach()),
+            "alignment_loss": float(alignment.detach()),
+            "variance_loss": float((general_variance + aligned_variance).detach()),
+            "covariance_loss": float(
+                (general_covariance + aligned_covariance).detach()
+            ),
+            "alignment_uniformity_loss": float(alignment_uniformity.detach()),
+            "alignment_centroid_loss": float(alignment_centroid.detach()),
+            "alignment_modality_centroid_loss": float(
+                alignment_modality_centroid.detach()
+            ),
+            "embedding_std": general_diagnostics.mean_feature_std,
+            "effective_rank": general_diagnostics.effective_rank,
+            "aligned_embedding_std": aligned_diagnostics.mean_feature_std,
+            "aligned_effective_rank": aligned_diagnostics.effective_rank,
+            "collapsed": float(
+                general_diagnostics.collapsed or aligned_diagnostics.collapsed
+            ),
+            "masked_fraction": float(mask.float().mean()),
+            "target_signal_residual_norm": float(residual_norm),
+            **multiview_alignment_diagnostics(
+                aligned, batch["molecule_index"]
+            ),
+            **pairwise_multiview_alignment_diagnostics(
+                aligned,
+                batch["molecule_index"],
+                batch["acquisition"],
+            ),
+        }
+        molecule = batch["molecule_index"]
+        acquisition = batch["acquisition"]
+        upper = torch.triu(
+            torch.ones(
+                (molecule.shape[0], molecule.shape[0]),
+                dtype=torch.bool,
+                device=molecule.device,
+            ),
+            diagonal=1,
+        )
+        positive_pairs = (molecule[:, None] == molecule[None, :]) & upper
+        pair_count = positive_pairs.float().sum().clamp_min(1.0)
+        for first_acquisition in range(5):
+            for second_acquisition in range(first_acquisition + 1, 5):
+                family_pair = (
+                    (
+                        (acquisition[:, None] == first_acquisition)
+                        & (acquisition[None, :] == second_acquisition)
+                    )
+                    | (
+                        (acquisition[:, None] == second_acquisition)
+                        & (acquisition[None, :] == first_acquisition)
+                    )
+                )
+                metrics[
+                    f"pair_fraction_{first_acquisition}_{second_acquisition}"
+                ] = float((positive_pairs & family_pair).float().sum() / pair_count)
         return total, metrics
 
 
@@ -306,16 +506,27 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
     if dataset.manifest["n_bins"] != config.encoder.n_bins:
         raise ValueError("dataset n_bins does not match encoder configuration")
     _filter_acquisition(dataset, config.acquisition, config.excluded_acquisitions)
-    paired = PairedSpectrumDataset(dataset, seed=config.seed)
+    if config.views_per_molecule > 2:
+        sampled: PairedSpectrumDataset | MultiViewSpectrumDataset = (
+            MultiViewSpectrumDataset(
+                dataset,
+                views_per_molecule=config.views_per_molecule,
+                seed=config.seed,
+            )
+        )
+        collate = multiview_collate
+    else:
+        sampled = PairedSpectrumDataset(dataset, seed=config.seed)
+        collate = paired_collate
     loader_generator = torch.Generator().manual_seed(config.seed)
     loader = DataLoader(
-        paired,
+        sampled,
         batch_size=config.batch_size,
         shuffle=True,
         generator=loader_generator,
         num_workers=config.num_workers,
-        collate_fn=paired_collate,
-        drop_last=len(paired) >= config.batch_size,
+        collate_fn=collate,
+        drop_last=len(sampled) >= config.batch_size,
         pin_memory=device.type == "cuda",
     )
     experiment: JEPAExperiment | MaskedAutoencoderExperiment
@@ -371,7 +582,7 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
         run_manifest=manifest,
         dataset_manifest=dataset.manifest,
         encoder_parameters=sum(parameter.numel() for parameter in experiment.online.parameters()),
-        train_molecules=len(paired),
+        train_molecules=len(sampled),
         steps_per_epoch=len(loader),
     )
     if tracker.run is not None:
@@ -384,15 +595,28 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
     total_steps = config.epochs * len(loader)
     with metrics_path.open(metrics_mode) as metrics_file:
         for epoch in range(start_epoch, config.epochs):
-            paired.set_epoch(epoch)
+            sampled.set_epoch(epoch)
             experiment.train()
             running = 0.0
-            for batch_index, (first, second) in enumerate(loader):
+            for batch_index, loaded_batch in enumerate(loader):
                 step_started = time.monotonic()
-                first = move_batch(first, device)
-                second = move_batch(second, device)
                 optimizer.zero_grad(set_to_none=True)
-                loss, metrics = experiment(first, second)
+                if config.views_per_molecule > 2:
+                    if not isinstance(experiment, JEPAExperiment):
+                        raise ValueError("multi-view training is only supported for JEPA")
+                    multiview = move_batch(loaded_batch, device)
+                    loss, metrics = experiment.forward_multiview(multiview)
+                    molecules_this_step = int(
+                        torch.unique(multiview["molecule_index"]).numel()
+                    )
+                    spectra_this_step = int(multiview["intensity"].shape[0])
+                else:
+                    first, second = loaded_batch
+                    first = move_batch(first, device)
+                    second = move_batch(second, device)
+                    loss, metrics = experiment(first, second)
+                    molecules_this_step = int(first["intensity"].shape[0])
+                    spectra_this_step = molecules_this_step * 2
                 if not torch.isfinite(loss):
                     raise FloatingPointError(f"non-finite loss at step {global_step}: {loss}")
                 loss.backward()
@@ -414,8 +638,9 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                     "gradient_norm": float(gradient_norm),
                     "elapsed_seconds": time.monotonic() - start_time,
                     "step_seconds": step_seconds,
-                    "molecule_pairs_per_second": config.batch_size / step_seconds,
-                    "spectra_per_second": 2 * config.batch_size / step_seconds,
+                    "molecule_pairs_per_second": molecules_this_step / step_seconds,
+                    "molecules_per_second": molecules_this_step / step_seconds,
+                    "spectra_per_second": spectra_this_step / step_seconds,
                     "epoch_progress": (batch_index + 1) / len(loader),
                     "global_progress": (global_step + 1) / total_steps,
                     "eta_hours": max(0, total_steps - global_step - 1)
@@ -510,7 +735,17 @@ def load_encoder_checkpoint(path: str | Path, device: str | torch.device = "cpu"
     from .model import EncoderConfig
 
     encoder = UniversalSpectrumEncoder(config=EncoderConfig(**payload["encoder_config"]))
-    encoder.load_state_dict(payload["online_encoder"])
+    missing, unexpected = encoder.load_state_dict(payload["online_encoder"], strict=False)
+    allowed_missing = {
+        "alignment_summary_token",
+        "aligned_batch_norm.running_mean",
+        "aligned_batch_norm.running_var",
+        "aligned_batch_norm.num_batches_tracked",
+    }
+    if set(missing) - allowed_missing or unexpected:
+        raise RuntimeError(
+            f"checkpoint state mismatch; missing={missing}, unexpected={unexpected}"
+        )
     encoder.to(device)
     encoder.eval()
     return encoder

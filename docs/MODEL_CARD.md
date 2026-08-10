@@ -20,10 +20,20 @@ The model returns:
 The online encoder sees a physically perturbed signal with 40–60% of patches
 masked. An EMA target encoder sees a complete, lightly perturbed view. The latent
 predictor estimates target patch representations only at masked locations.
-Paired spectra from the same molecule receive a symmetric contrastive alignment
-loss. Embedding standard deviation and effective rank are recorded at every step;
-variance regularization activates only when a configured collapse threshold is
-crossed.
+
+Following the first-pilot failure analysis, aligned training uses one lightly
+augmented spectrum from every available acquisition family for each molecule.
+Every other same-molecule view is a positive in a multi-positive contrastive
+loss. The general token retains acquisition metadata. Patch and alignment tokens
+do not receive categorical acquisition embeddings and cannot attend back to the
+metadata-rich general token, preventing the direct technique shortcut while
+retaining one shared Transformer. Running batch centering, aligned variance and
+covariance control, and acquisition-centroid penalties are active throughout
+aligned training.
+
+Embedding standard deviation, effective rank, positive and negative cosine,
+batch retrieval, centroid norm, uniformity loss, and all ten acquisition-pair
+frequencies are recorded at every step.
 
 ## Intended use
 
@@ -37,6 +47,8 @@ decisions, regulatory submissions, or unsupervised identification of unknowns.
 - The primary pretraining corpus is simulated and may teach simulator artifacts.
 - A shared model can learn technique identity without learning transferable
   chemistry; the modality-shortcut test must accompany downstream results.
+- Multi-view alignment increases per-molecule compute and does not guarantee
+  that weakly related techniques such as IR and MS/MS become molecule-identifying.
 - Robust per-spectrum scaling discards absolute instrument response.
 - Rasterizing centroided MS/MS peaks introduces a resolution choice.
 - Coordinate perturbations are deliberately small and do not represent every
@@ -49,4 +61,3 @@ decisions, regulatory submissions, or unsupervised identification of unknowns.
 Every checkpoint must be accompanied by the canonical dataset manifest, split
 digest, training configuration, run manifest, five-seed probe results, retrieval
 results, robustness results, modality-shortcut accuracy, and license audit.
-
