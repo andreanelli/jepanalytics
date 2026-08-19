@@ -10,6 +10,7 @@ from jepanalytics.augment import AugmentationConfig
 from jepanalytics.config import TrainingConfig
 from jepanalytics.data import (
     CanonicalSpectraDataset,
+    FormulaMassBatchSampler,
     MultiViewSpectrumDataset,
     build_synthetic_store,
     multiview_collate,
@@ -27,7 +28,13 @@ from jepanalytics.model import (
     UniversalSpectrumEncoder,
     batch_to_encoder_kwargs,
 )
-from jepanalytics.training import _restore_rng_state, train
+from jepanalytics.training import (
+    JEPAExperiment,
+    _restore_rng_state,
+    jepa_token_mask,
+    train,
+    warm_start_encoder,
+)
 
 
 def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
@@ -60,6 +67,7 @@ def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
         learning_rate=0.003,
         mask_ratio=0.5,
         alignment_weight=0.05,
+        summary_jepa_weight=1.0,
         ema_decay=0.95,
         collapse_min_rank=1.0,
         device="cpu",
@@ -74,6 +82,8 @@ def test_tiny_synthetic_training_is_finite_and_improves(tmp_path: Path):
     assert all(row["effective_rank"] > 1 for row in rows)
     assert all(row["aligned_effective_rank"] > 1 for row in rows)
     assert all(row["target_signal_residual_norm"] > 0 for row in rows)
+    assert all(row["target_summary_signal_residual_norm"] > 0 for row in rows)
+    assert all(np.isfinite(row["summary_jepa_loss"]) for row in rows)
     manifest = json.loads((run / "run_manifest.json").read_text())
     assert len(manifest["dataset_manifest_sha256"]) == 64
     assert len(manifest["artifacts"]["best_checkpoint"]["sha256"]) == 64
@@ -232,3 +242,163 @@ def test_multiview_jepa_training_logs_balanced_positive_pairs(tmp_path: Path):
                 abs(row[f"pair_fraction_{first}_{second}"] - 0.1) < 1e-6
                 for row in rows
             )
+
+
+def test_formula_distillation_loss_is_finite_on_multiview_batch(tmp_path: Path):
+    data = tmp_path / "chemistry-data"
+    build_synthetic_store(data, n_molecules=16, n_bins=64, n_labels=4, seed=12)
+    targets = np.random.default_rng(12).normal(size=(16, 3)).astype(np.float32)
+    base = CanonicalSpectraDataset(data, "train", molecule_targets=targets)
+    samples = MultiViewSpectrumDataset(base, views_per_molecule=5, seed=12)
+    loaded = next(
+        iter(
+            DataLoader(
+                samples,
+                batch_size=4,
+                shuffle=False,
+                collate_fn=multiview_collate,
+            )
+        )
+    )
+    config = TrainingConfig(
+        data_root=str(data),
+        output_dir=str(tmp_path / "unused"),
+        encoder=EncoderConfig(
+            n_bins=64,
+            patch_size=8,
+            hidden_dim=32,
+            depth=1,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=16,
+        ),
+        views_per_molecule=5,
+        alignment_weight=0.2,
+        chemistry_weight=1.0,
+        chemistry_target_root="unused",
+        chemistry_target_dim=3,
+    )
+    experiment = JEPAExperiment(config)
+    loss, metrics = experiment.forward_multiview(loaded)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert metrics["chemistry_loss"] > 0
+
+
+def test_formula_matched_prototype_loss_is_finite_on_multiview_batch(tmp_path: Path):
+    data = tmp_path / "prototype-data"
+    build_synthetic_store(data, n_molecules=16, n_bins=64, n_labels=4, seed=14)
+    rng = np.random.default_rng(14)
+    targets = rng.normal(size=(16, 3)).astype(np.float32)
+    matching = rng.normal(size=(16, 4)).astype(np.float32)
+    base = CanonicalSpectraDataset(
+        data,
+        "train",
+        molecule_targets=targets,
+        molecule_matching_targets=matching,
+    )
+    samples = MultiViewSpectrumDataset(base, views_per_molecule=5, seed=14)
+    loaded = next(
+        iter(
+            DataLoader(
+                samples,
+                batch_size=4,
+                shuffle=False,
+                collate_fn=multiview_collate,
+            )
+        )
+    )
+    config = TrainingConfig(
+        data_root=str(data),
+        output_dir=str(tmp_path / "unused-prototype"),
+        encoder=EncoderConfig(
+            n_bins=64,
+            patch_size=8,
+            hidden_dim=32,
+            depth=1,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=16,
+        ),
+        views_per_molecule=5,
+        alignment_weight=0.2,
+        chemistry_weight=1.0,
+        chemistry_target_root="unused",
+        chemistry_target_dim=3,
+        prototype_alignment_weight=0.2,
+        prototype_hard_negatives=2,
+    )
+    experiment = JEPAExperiment(config)
+    loss, metrics = experiment.forward_multiview(loaded)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert metrics["prototype_alignment_loss"] > 0
+    assert metrics["prototype_negatives_per_anchor"] == 2.0
+
+
+def test_formula_mass_batch_sampler_is_complete_deterministic_and_local():
+    molecules = np.arange(24, dtype=np.int64)
+    matching = np.zeros((24, 3), dtype=np.float32)
+    matching[:, -1] = np.arange(24, dtype=np.float32)
+    sampler = FormulaMassBatchSampler(
+        molecules,
+        matching,
+        batch_size=4,
+        seed=17,
+        window_batches=2,
+        drop_last=False,
+    )
+    first = list(sampler)
+    assert list(sampler) == first
+    assert sorted(index for batch in first for index in batch) == list(range(24))
+    assert all(np.ptp(matching[batch, -1]) <= 7 for batch in first)
+    sampler.set_epoch(1)
+    assert list(sampler) != first
+
+
+def test_hybrid_mask_reserves_peak_tokens_and_masks_half_the_dense_tokens():
+    config = EncoderConfig(
+        n_bins=96,
+        patch_size=8,
+        hidden_dim=36,
+        depth=1,
+        heads=4,
+        aligned_dim=16,
+        tokenizer_type="hybrid_peak_multiscale",
+        multiscale_kernel_sizes=(5, 9, 15),
+        hybrid_peak_tokens=3,
+        peak_window_size=5,
+        peak_suppression_size=5,
+    )
+    mask = jepa_token_mask(torch.randn(2, 96), config, 0.5)
+    assert mask.shape == (2, 12)
+    assert torch.all(mask[:, :9].sum(dim=1) == 4)
+    assert not mask[:, 9:].any()
+
+
+def test_warm_start_reuses_backbone_when_tokenizer_changes():
+    common = dict(
+        n_bins=96,
+        patch_size=8,
+        hidden_dim=36,
+        depth=1,
+        heads=4,
+        aligned_dim=16,
+        multiscale_kernel_sizes=(5, 9, 15),
+        hybrid_peak_tokens=3,
+        peak_window_size=5,
+        peak_suppression_size=5,
+    )
+    source = UniversalSpectrumEncoder(EncoderConfig(**common))
+    destination = UniversalSpectrumEncoder(
+        EncoderConfig(**common, tokenizer_type="hybrid_peak_multiscale")
+    )
+    details = warm_start_encoder(destination, source.state_dict())
+    assert "patch_projection.weight" in details["ignored_keys"]
+    assert any(
+        key.startswith("peak_projection.")
+        for key in details["initialized_keys"]
+    )
+    source_weight = source.transformer.layers[0].linear1.weight
+    destination_weight = destination.transformer.layers[0].linear1.weight
+    assert torch.equal(source_weight, destination_weight)

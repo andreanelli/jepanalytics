@@ -18,6 +18,16 @@ def masked_latent_loss(
     return 2.0 - 2.0 * (predicted * target).sum(dim=-1).mean()
 
 
+def latent_vector_loss(predicted: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Cosine latent-prediction loss for one global vector per spectrum."""
+
+    if predicted.shape != target.shape or predicted.ndim != 2:
+        raise ValueError("predicted and target must have matching [batch, features] shapes")
+    predicted = F.normalize(predicted, dim=-1)
+    target = F.normalize(target.detach(), dim=-1)
+    return 2.0 - 2.0 * (predicted * target).sum(dim=-1).mean()
+
+
 def symmetric_alignment_loss(
     first: torch.Tensor, second: torch.Tensor, temperature: float = 0.07
 ) -> torch.Tensor:
@@ -82,6 +92,84 @@ def multi_positive_alignment_loss(
     numerator = torch.logsumexp(logits.masked_fill(~positive, -torch.inf), dim=1)
     denominator = torch.logsumexp(logits.masked_fill(~valid, -torch.inf), dim=1)
     return (denominator - numerator).mean()
+
+
+def hard_negative_prototype_alignment_loss(
+    query: torch.Tensor,
+    target: torch.Tensor,
+    molecule: torch.Tensor,
+    matching_features: torch.Tensor,
+    *,
+    temperature: float = 0.10,
+    hard_negatives: int = 8,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Align views to leave-one-view-out EMA molecule prototypes.
+
+    Other-molecule prototypes are ranked only by formula/mass matching features.
+    The positive target is the mean of the molecule's remaining acquisition
+    views, preventing a same-view teacher/student shortcut.
+    """
+
+    if query.shape != target.shape or query.ndim != 2:
+        raise ValueError("query and target must have matching [batch, dimension] shapes")
+    if molecule.shape != (query.shape[0],):
+        raise ValueError("molecule must have shape [batch]")
+    if matching_features.ndim != 2 or matching_features.shape[0] != query.shape[0]:
+        raise ValueError("matching_features must have shape [batch, features]")
+    if temperature <= 0 or hard_negatives < 1:
+        raise ValueError("temperature and hard_negatives must be positive")
+
+    unique, inverse = torch.unique(molecule, sorted=True, return_inverse=True)
+    if unique.numel() < 2:
+        raise ValueError("prototype alignment requires at least two molecules")
+    counts = torch.bincount(inverse, minlength=unique.numel()).to(query.dtype)
+    if bool((counts < 2).any()):
+        raise ValueError("every prototype anchor requires another molecular view")
+
+    detached_target = target.detach()
+    target_sums = detached_target.new_zeros((unique.numel(), target.shape[1]))
+    target_sums.index_add_(0, inverse, detached_target)
+    prototypes = target_sums / counts[:, None]
+    positive = (target_sums[inverse] - detached_target) / (counts[inverse, None] - 1.0)
+
+    detached_matching = matching_features.detach().float()
+    matching_sums = detached_matching.new_zeros(
+        (unique.numel(), matching_features.shape[1])
+    )
+    matching_sums.index_add_(0, inverse, detached_matching)
+    molecule_matching = matching_sums / counts.float()[:, None]
+    distance = torch.cdist(molecule_matching, molecule_matching)
+    distance.fill_diagonal_(torch.inf)
+    negative_count = min(hard_negatives, unique.numel() - 1)
+    negative_indices = distance.topk(
+        negative_count, dim=1, largest=False
+    ).indices[inverse]
+
+    normalized_query = F.normalize(query, dim=-1)
+    positive_similarity = (normalized_query * F.normalize(positive, dim=-1)).sum(dim=-1)
+    normalized_prototypes = F.normalize(prototypes, dim=-1)
+    negative_similarity = torch.einsum(
+        "bd,bkd->bk", normalized_query, normalized_prototypes[negative_indices]
+    )
+    logits = torch.cat((positive_similarity[:, None], negative_similarity), dim=1)
+    loss = F.cross_entropy(
+        logits / temperature,
+        torch.zeros(query.shape[0], dtype=torch.long, device=query.device),
+    )
+    with torch.no_grad():
+        hard_distance = distance[inverse[:, None], negative_indices]
+        negative_mean = negative_similarity.mean()
+        diagnostics = {
+            "prototype_positive_cosine": float(positive_similarity.mean()),
+            "prototype_hard_negative_cosine": float(negative_mean),
+            "prototype_cosine_margin": float(
+                positive_similarity.mean() - negative_mean
+            ),
+            "prototype_batch_top1": float((logits.argmax(dim=1) == 0).float().mean()),
+            "prototype_hard_negative_distance": float(hard_distance.mean()),
+            "prototype_negatives_per_anchor": float(negative_count),
+        }
+    return loss, diagnostics
 
 
 def group_centroid_regularization(

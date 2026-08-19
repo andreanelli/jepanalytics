@@ -1,0 +1,1273 @@
+{
+  "acquisitions": [
+    2
+  ],
+  "batch_size": 128,
+  "data_root": "/Users/rebgasse/git/jepanalytics/data/processed/pilot",
+  "epochs": 60,
+  "fraction": 0.01,
+  "kind": "supervised_coordinate_cnn_ceiling",
+  "label_names": [
+    "Acid anhydride",
+    "Acyl halide",
+    "Alcohol",
+    "Aldehyde",
+    "Alkane",
+    "Alkene",
+    "Alkyne",
+    "Amide",
+    "Amine",
+    "Arene",
+    "Azo compound",
+    "Carbamate",
+    "Carboxylic acid",
+    "Enamine",
+    "Enol",
+    "Ester",
+    "Ether",
+    "Haloalkane",
+    "Hydrazine",
+    "Hydrazone",
+    "Imide",
+    "Imine",
+    "Isocyanate",
+    "Isothiocyanate",
+    "Ketone",
+    "Nitrile",
+    "Phenol",
+    "Phosphine",
+    "Sulfide",
+    "Sulfonamide",
+    "Sulfonate",
+    "Sulfone",
+    "Sulfonic acid",
+    "Sulfoxide",
+    "Thial",
+    "Thioamide",
+    "Thiol"
+  ],
+  "max_validation_molecules": 3000,
+  "results": [
+    {
+      "acquisition": "C13_NMR",
+      "best_epoch": 15,
+      "fraction": 0.01,
+      "labeled_molecules": 800,
+      "macro_auprc": 0.23862360842838487,
+      "macro_f1": 0.22143594475874542,
+      "per_label": [
+        {
+          "auprc": 0.0011620001451226622,
+          "label": 0,
+          "normalized_lift": -0.00033850762936431396,
+          "prevalence": 0.001500000013038516
+        },
+        {
+          "auprc": 0.006019119321648446,
+          "label": 1,
+          "normalized_lift": 0.0005219902980746219,
+          "prevalence": 0.005499999970197678
+        },
+        {
+          "auprc": 0.3529037119849505,
+          "label": 2,
+          "normalized_lift": 0.1205541047371641,
+          "prevalence": 0.26420000195503235
+        },
+        {
+          "auprc": 0.22152557021241975,
+          "label": 3,
+          "normalized_lift": 0.20205573041016103,
+          "prevalence": 0.024399999529123306
+        },
+        {
+          "auprc": 0.9950562077051982,
+          "label": 4,
+          "normalized_lift": 0.8656579162538744,
+          "prevalence": 0.9631999731063843
+        },
+        {
+          "auprc": 0.13787102561081419,
+          "label": 5,
+          "normalized_lift": 0.0217531236769432,
+          "prevalence": 0.11869999766349792
+        },
+        {
+          "auprc": 0.23263723690321778,
+          "label": 6,
+          "normalized_lift": 0.21825309350452007,
+          "prevalence": 0.018400000408291817
+        },
+        {
+          "auprc": 0.5669450857914617,
+          "label": 7,
+          "normalized_lift": 0.41399875705052863,
+          "prevalence": 0.26100000739097595
+        },
+        {
+          "auprc": 0.5572793470409285,
+          "label": 8,
+          "normalized_lift": 0.25000735618507436,
+          "prevalence": 0.4097000062465668
+        },
+        {
+          "auprc": 0.9388730223001183,
+          "label": 9,
+          "normalized_lift": 0.7405476269715326,
+          "prevalence": 0.7644000053405762
+        },
+        {
+          "auprc": 0.003678160823461582,
+          "label": 10,
+          "normalized_lift": 0.0016815237761787733,
+          "prevalence": 0.0020000000949949026
+        },
+        {
+          "auprc": 0.7206433568515682,
+          "label": 11,
+          "normalized_lift": 0.6909429760709237,
+          "prevalence": 0.09610000252723694
+        },
+        {
+          "auprc": 0.2605980163235675,
+          "label": 12,
+          "normalized_lift": 0.1785335145984251,
+          "prevalence": 0.09989999979734421
+        },
+        {
+          "auprc": 0.020306852763898268,
+          "label": 13,
+          "normalized_lift": 0.008708745399705444,
+          "prevalence": 0.011699999682605267
+        },
+        {
+          "auprc": 0.014084432343878546,
+          "label": 14,
+          "normalized_lift": 0.009329212337236461,
+          "prevalence": 0.004800000227987766
+        },
+        {
+          "auprc": 0.5912539523269699,
+          "label": 15,
+          "normalized_lift": 0.4955620740153373,
+          "prevalence": 0.18970000743865967
+        },
+        {
+          "auprc": 0.8389193978142793,
+          "label": 16,
+          "normalized_lift": 0.6318999175560042,
+          "prevalence": 0.5623999834060669
+        },
+        {
+          "auprc": 0.6070196629986025,
+          "label": 17,
+          "normalized_lift": 0.2882080510182465,
+          "prevalence": 0.4478999972343445
+        },
+        {
+          "auprc": 0.00753801868857402,
+          "label": 18,
+          "normalized_lift": -0.001475258247653107,
+          "prevalence": 0.008999999612569809
+        },
+        {
+          "auprc": 0.006084979198990419,
+          "label": 19,
+          "normalized_lift": 0.0003871860634769611,
+          "prevalence": 0.00570000009611249
+        },
+        {
+          "auprc": 0.03590714990382234,
+          "label": 20,
+          "normalized_lift": 0.018335353322183928,
+          "prevalence": 0.017899999395012856
+        },
+        {
+          "auprc": 0.0066008831460978865,
+          "label": 21,
+          "normalized_lift": 0.0015085767035341925,
+          "prevalence": 0.005100000184029341
+        },
+        {
+          "auprc": 0.0013598787566653733,
+          "label": 22,
+          "normalized_lift": 0.0003602389481331656,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.0007930141292094323,
+          "label": 23,
+          "normalized_lift": 9.307930968333243e-05,
+          "prevalence": 0.000699999975040555
+        },
+        {
+          "auprc": 0.5961652995687815,
+          "label": 24,
+          "normalized_lift": 0.5574899199838281,
+          "prevalence": 0.08739999681711197
+        },
+        {
+          "auprc": 0.16890276227851625,
+          "label": 25,
+          "normalized_lift": 0.10950687379679713,
+          "prevalence": 0.06669999659061432
+        },
+        {
+          "auprc": 0.09664973012435633,
+          "label": 26,
+          "normalized_lift": 0.04306115304052366,
+          "prevalence": 0.0560000017285347
+        },
+        {
+          "auprc": 0.0010777787553649199,
+          "label": 27,
+          "normalized_lift": 7.785656443560215e-05,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.14653228711255697,
+          "label": 28,
+          "normalized_lift": 0.033773673822514325,
+          "prevalence": 0.11670000106096268
+        },
+        {
+          "auprc": 0.07599208187133732,
+          "label": 29,
+          "normalized_lift": 0.028995462511552543,
+          "prevalence": 0.04839999973773956
+        },
+        {
+          "auprc": 0.06781115812172343,
+          "label": 30,
+          "normalized_lift": 0.05887042747018058,
+          "prevalence": 0.009499999694526196
+        },
+        {
+          "auprc": 0.03472375297111813,
+          "label": 31,
+          "normalized_lift": 0.012404084567121635,
+          "prevalence": 0.022600000724196434
+        },
+        {
+          "auprc": NaN,
+          "label": 32,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.006375677396886563,
+          "label": 33,
+          "normalized_lift": 0.0016835903391667828,
+          "prevalence": 0.004699999932199717
+        },
+        {
+          "auprc": NaN,
+          "label": 34,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.025147971918724647,
+          "label": 35,
+          "normalized_lift": 0.02034767547160347,
+          "prevalence": 0.004900000058114529
+        },
+        {
+          "auprc": 0.0073877117886373455,
+          "label": 36,
+          "normalized_lift": 0.003501367226247517,
+          "prevalence": 0.0038999998942017555
+        }
+      ],
+      "seed": 11,
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      },
+      "validation_auprc": 0.2355049202399736
+    },
+    {
+      "acquisition": "C13_NMR",
+      "best_epoch": 10,
+      "fraction": 0.01,
+      "labeled_molecules": 800,
+      "macro_auprc": 0.2369134523492395,
+      "macro_f1": 0.22607215830182054,
+      "per_label": [
+        {
+          "auprc": 0.00189987009444044,
+          "label": 0,
+          "normalized_lift": 0.00040047078758852824,
+          "prevalence": 0.001500000013038516
+        },
+        {
+          "auprc": 0.013650036933138631,
+          "label": 1,
+          "normalized_lift": 0.008195110068071111,
+          "prevalence": 0.005499999970197678
+        },
+        {
+          "auprc": 0.3567638677474526,
+          "label": 2,
+          "normalized_lift": 0.12580030720082078,
+          "prevalence": 0.26420000195503235
+        },
+        {
+          "auprc": 0.23884016162113814,
+          "label": 3,
+          "normalized_lift": 0.21980336407186812,
+          "prevalence": 0.024399999529123306
+        },
+        {
+          "auprc": 0.9948802891119182,
+          "label": 4,
+          "normalized_lift": 0.8608775231908858,
+          "prevalence": 0.9631999731063843
+        },
+        {
+          "auprc": 0.1668513239824868,
+          "label": 5,
+          "normalized_lift": 0.054636702815534004,
+          "prevalence": 0.11869999766349792
+        },
+        {
+          "auprc": 0.20445392926264233,
+          "label": 6,
+          "normalized_lift": 0.1895414923917469,
+          "prevalence": 0.018400000408291817
+        },
+        {
+          "auprc": 0.5702048994955892,
+          "label": 7,
+          "normalized_lift": 0.41840987171457444,
+          "prevalence": 0.26100000739097595
+        },
+        {
+          "auprc": 0.607281562307485,
+          "label": 8,
+          "normalized_lift": 0.33471380340797957,
+          "prevalence": 0.4097000062465668
+        },
+        {
+          "auprc": 0.9374285399927028,
+          "label": 9,
+          "normalized_lift": 0.7344165474292621,
+          "prevalence": 0.7644000053405762
+        },
+        {
+          "auprc": 0.0036754418688414057,
+          "label": 10,
+          "normalized_lift": 0.0016787993727514835,
+          "prevalence": 0.0020000000949949026
+        },
+        {
+          "auprc": 0.7026859812973436,
+          "label": 11,
+          "normalized_lift": 0.6710764248988559,
+          "prevalence": 0.09610000252723694
+        },
+        {
+          "auprc": 0.2639959956135609,
+          "label": 12,
+          "normalized_lift": 0.18230862768500256,
+          "prevalence": 0.09989999979734421
+        },
+        {
+          "auprc": 0.017689924168592067,
+          "label": 13,
+          "normalized_lift": 0.006060836268403443,
+          "prevalence": 0.011699999682605267
+        },
+        {
+          "auprc": 0.037655225466307486,
+          "label": 14,
+          "normalized_lift": 0.03301369096246628,
+          "prevalence": 0.004800000227987766
+        },
+        {
+          "auprc": 0.5130572082229388,
+          "label": 15,
+          "normalized_lift": 0.39905862489539723,
+          "prevalence": 0.18970000743865967
+        },
+        {
+          "auprc": 0.8454345767203837,
+          "label": 16,
+          "normalized_lift": 0.6467883514203706,
+          "prevalence": 0.5623999834060669
+        },
+        {
+          "auprc": 0.5694199414371244,
+          "label": 17,
+          "normalized_lift": 0.22010495126615726,
+          "prevalence": 0.4478999972343445
+        },
+        {
+          "auprc": 0.009479421289435196,
+          "label": 18,
+          "normalized_lift": 0.000483775657596325,
+          "prevalence": 0.008999999612569809
+        },
+        {
+          "auprc": 0.005242893138959265,
+          "label": 19,
+          "normalized_lift": -0.00045972740339677155,
+          "prevalence": 0.00570000009611249
+        },
+        {
+          "auprc": 0.045608369482875256,
+          "label": 20,
+          "normalized_lift": 0.028213389747269793,
+          "prevalence": 0.017899999395012856
+        },
+        {
+          "auprc": 0.0059025881375466245,
+          "label": 21,
+          "normalized_lift": 0.0008067021345519556,
+          "prevalence": 0.005100000184029341
+        },
+        {
+          "auprc": 0.0010044774925118817,
+          "label": 22,
+          "normalized_lift": 4.481926941584845e-06,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.0030153482806047024,
+          "label": 23,
+          "normalized_lift": 0.002316970184635562,
+          "prevalence": 0.000699999975040555
+        },
+        {
+          "auprc": 0.6078589020152453,
+          "label": 24,
+          "normalized_lift": 0.5703034225103236,
+          "prevalence": 0.08739999681711197
+        },
+        {
+          "auprc": 0.16452861764113666,
+          "label": 25,
+          "normalized_lift": 0.1048201228899069,
+          "prevalence": 0.06669999659061432
+        },
+        {
+          "auprc": 0.08782052429249369,
+          "label": 26,
+          "normalized_lift": 0.033708180743882155,
+          "prevalence": 0.0560000017285347
+        },
+        {
+          "auprc": 0.0009441609274786518,
+          "label": 27,
+          "normalized_lift": -5.589501503649086e-05,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.16030928796006824,
+          "label": 28,
+          "normalized_lift": 0.0493708671476126,
+          "prevalence": 0.11670000106096268
+        },
+        {
+          "auprc": 0.06789744383221565,
+          "label": 29,
+          "normalized_lift": 0.020489117369800965,
+          "prevalence": 0.04839999973773956
+        },
+        {
+          "auprc": 0.015415294077312605,
+          "label": 30,
+          "normalized_lift": 0.0059720286531672,
+          "prevalence": 0.009499999694526196
+        },
+        {
+          "auprc": 0.040542902022009324,
+          "label": 31,
+          "normalized_lift": 0.018357787304182048,
+          "prevalence": 0.022600000724196434
+        },
+        {
+          "auprc": NaN,
+          "label": 32,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.00544625896407078,
+          "label": 33,
+          "normalized_lift": 0.0007497830119765172,
+          "prevalence": 0.004699999932199717
+        },
+        {
+          "auprc": NaN,
+          "label": 34,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.018846630490113498,
+          "label": 35,
+          "normalized_lift": 0.014015305429417608,
+          "prevalence": 0.004900000058114529
+        },
+        {
+          "auprc": 0.006238936835218421,
+          "label": 36,
+          "normalized_lift": 0.0023480945093547244,
+          "prevalence": 0.0038999998942017555
+        }
+      ],
+      "seed": 17,
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      },
+      "validation_auprc": 0.2353437167311366
+    },
+    {
+      "acquisition": "C13_NMR",
+      "best_epoch": 15,
+      "fraction": 0.01,
+      "labeled_molecules": 800,
+      "macro_auprc": 0.23947038181984226,
+      "macro_f1": 0.22068431249463777,
+      "per_label": [
+        {
+          "auprc": 0.0015092602924905742,
+          "label": 0,
+          "normalized_lift": 9.274190738286501e-06,
+          "prevalence": 0.001500000013038516
+        },
+        {
+          "auprc": 0.026412184682728553,
+          "label": 1,
+          "normalized_lift": 0.02102783781991372,
+          "prevalence": 0.005499999970197678
+        },
+        {
+          "auprc": 0.37261195760311067,
+          "label": 2,
+          "normalized_lift": 0.1473388909161873,
+          "prevalence": 0.26420000195503235
+        },
+        {
+          "auprc": 0.23225118152013893,
+          "label": 3,
+          "normalized_lift": 0.21304959193388226,
+          "prevalence": 0.024399999529123306
+        },
+        {
+          "auprc": 0.9951509696107051,
+          "label": 4,
+          "normalized_lift": 0.8682329661520958,
+          "prevalence": 0.9631999731063843
+        },
+        {
+          "auprc": 0.1373063179748074,
+          "label": 5,
+          "normalized_lift": 0.021112357042982435,
+          "prevalence": 0.11869999766349792
+        },
+        {
+          "auprc": 0.16529908259533416,
+          "label": 6,
+          "normalized_lift": 0.14965269177683813,
+          "prevalence": 0.018400000408291817
+        },
+        {
+          "auprc": 0.5678118873288952,
+          "label": 7,
+          "normalized_lift": 0.415171695543225,
+          "prevalence": 0.26100000739097595
+        },
+        {
+          "auprc": 0.5935424122045838,
+          "label": 8,
+          "normalized_lift": 0.3114389427468087,
+          "prevalence": 0.4097000062465668
+        },
+        {
+          "auprc": 0.942576166966431,
+          "label": 9,
+          "normalized_lift": 0.7562655588486784,
+          "prevalence": 0.7644000053405762
+        },
+        {
+          "auprc": 0.0019672161162546213,
+          "label": 10,
+          "normalized_lift": -3.284967809960106e-05,
+          "prevalence": 0.0020000000949949026
+        },
+        {
+          "auprc": 0.7156303287437067,
+          "label": 11,
+          "normalized_lift": 0.6853969774849323,
+          "prevalence": 0.09610000252723694
+        },
+        {
+          "auprc": 0.28476531742918515,
+          "label": 12,
+          "normalized_lift": 0.20538308809045536,
+          "prevalence": 0.09989999979734421
+        },
+        {
+          "auprc": 0.023300696134195494,
+          "label": 13,
+          "normalized_lift": 0.011738031415425112,
+          "prevalence": 0.011699999682605267
+        },
+        {
+          "auprc": 0.028570127080164275,
+          "label": 14,
+          "normalized_lift": 0.02388477377172623,
+          "prevalence": 0.004800000227987766
+        },
+        {
+          "auprc": 0.5536038181523039,
+          "label": 15,
+          "normalized_lift": 0.4490976355107104,
+          "prevalence": 0.18970000743865967
+        },
+        {
+          "auprc": 0.8413442130838815,
+          "label": 16,
+          "normalized_lift": 0.6374410856950637,
+          "prevalence": 0.5623999834060669
+        },
+        {
+          "auprc": 0.609415459545754,
+          "label": 17,
+          "normalized_lift": 0.2925474760049339,
+          "prevalence": 0.4478999972343445
+        },
+        {
+          "auprc": 0.012944611237130513,
+          "label": 18,
+          "normalized_lift": 0.003980435542904706,
+          "prevalence": 0.008999999612569809
+        },
+        {
+          "auprc": 0.006132271037666743,
+          "label": 19,
+          "normalized_lift": 0.0004347490109585015,
+          "prevalence": 0.00570000009611249
+        },
+        {
+          "auprc": 0.08736392496669447,
+          "label": 20,
+          "normalized_lift": 0.07072999239272057,
+          "prevalence": 0.017899999395012856
+        },
+        {
+          "auprc": 0.008041646744120874,
+          "label": 21,
+          "normalized_lift": 0.0029567258625345836,
+          "prevalence": 0.005100000184029341
+        },
+        {
+          "auprc": 0.0015328557309116791,
+          "label": 22,
+          "normalized_lift": 0.0005333890725120745,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.0005406129771764593,
+          "label": 23,
+          "normalized_lift": -0.00015949864691295376,
+          "prevalence": 0.000699999975040555
+        },
+        {
+          "auprc": 0.6122447095698456,
+          "label": 24,
+          "normalized_lift": 0.5751092602698062,
+          "prevalence": 0.08739999681711197
+        },
+        {
+          "auprc": 0.1455498539097678,
+          "label": 25,
+          "normalized_lift": 0.08448500699786939,
+          "prevalence": 0.06669999659061432
+        },
+        {
+          "auprc": 0.08304928521030838,
+          "label": 26,
+          "normalized_lift": 0.028653902045871767,
+          "prevalence": 0.0560000017285347
+        },
+        {
+          "auprc": 0.0015126181380544703,
+          "label": 27,
+          "normalized_lift": 0.0005131312218031946,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.1546071749957544,
+          "label": 28,
+          "normalized_lift": 0.042915401313623196,
+          "prevalence": 0.11670000106096268
+        },
+        {
+          "auprc": 0.058841015838773825,
+          "label": 29,
+          "normalized_lift": 0.010972063995540904,
+          "prevalence": 0.04839999973773956
+        },
+        {
+          "auprc": 0.04575900967521751,
+          "label": 30,
+          "normalized_lift": 0.03660677432560212,
+          "prevalence": 0.009499999694526196
+        },
+        {
+          "auprc": 0.035293233205525194,
+          "label": 31,
+          "normalized_lift": 0.012986732648591882,
+          "prevalence": 0.022600000724196434
+        },
+        {
+          "auprc": NaN,
+          "label": 32,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.00461500842832184,
+          "label": 33,
+          "normalized_lift": -8.539285026834804e-05,
+          "prevalence": 0.004699999932199717
+        },
+        {
+          "auprc": NaN,
+          "label": 34,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.02387903180439225,
+          "label": 35,
+          "normalized_lift": 0.01907248693335957,
+          "prevalence": 0.004900000058114529
+        },
+        {
+          "auprc": 0.006487903160146344,
+          "label": 36,
+          "normalized_lift": 0.0025980356045273777,
+          "prevalence": 0.0038999998942017555
+        }
+      ],
+      "seed": 23,
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      },
+      "validation_auprc": 0.2326277448417418
+    },
+    {
+      "acquisition": "C13_NMR",
+      "best_epoch": 15,
+      "fraction": 0.01,
+      "labeled_molecules": 800,
+      "macro_auprc": 0.23656944755362477,
+      "macro_f1": 0.22204848862667872,
+      "per_label": [
+        {
+          "auprc": 0.0012884562463549248,
+          "label": 0,
+          "normalized_lift": -0.0002118615590248909,
+          "prevalence": 0.001500000013038516
+        },
+        {
+          "auprc": 0.011771882987511478,
+          "label": 1,
+          "normalized_lift": 0.006306569147436752,
+          "prevalence": 0.005499999970197678
+        },
+        {
+          "auprc": 0.3776778811734177,
+          "label": 2,
+          "normalized_lift": 0.15422381016566716,
+          "prevalence": 0.26420000195503235
+        },
+        {
+          "auprc": 0.2717550769226426,
+          "label": 3,
+          "normalized_lift": 0.2535414896208821,
+          "prevalence": 0.024399999529123306
+        },
+        {
+          "auprc": 0.9946125843845719,
+          "label": 4,
+          "normalized_lift": 0.8536029435249477,
+          "prevalence": 0.9631999731063843
+        },
+        {
+          "auprc": 0.16162327563820814,
+          "label": 5,
+          "normalized_lift": 0.048704502281756545,
+          "prevalence": 0.11869999766349792
+        },
+        {
+          "auprc": 0.18636563079459895,
+          "label": 6,
+          "normalized_lift": 0.17111413045657256,
+          "prevalence": 0.018400000408291817
+        },
+        {
+          "auprc": 0.5623380032877553,
+          "label": 7,
+          "normalized_lift": 0.407764545210497,
+          "prevalence": 0.26100000739097595
+        },
+        {
+          "auprc": 0.5696368726857292,
+          "label": 8,
+          "normalized_lift": 0.27094167056008406,
+          "prevalence": 0.4097000062465668
+        },
+        {
+          "auprc": 0.9410803046033238,
+          "label": 9,
+          "normalized_lift": 0.7499163975710241,
+          "prevalence": 0.7644000053405762
+        },
+        {
+          "auprc": 0.0036184369010647246,
+          "label": 10,
+          "normalized_lift": 0.0016216801665569873,
+          "prevalence": 0.0020000000949949026
+        },
+        {
+          "auprc": 0.7201916893213485,
+          "label": 11,
+          "normalized_lift": 0.6904432885706664,
+          "prevalence": 0.09610000252723694
+        },
+        {
+          "auprc": 0.28156303152803897,
+          "label": 12,
+          "normalized_lift": 0.20182538794555457,
+          "prevalence": 0.09989999979734421
+        },
+        {
+          "auprc": 0.016159243015656556,
+          "label": 13,
+          "normalized_lift": 0.004512034130951324,
+          "prevalence": 0.011699999682605267
+        },
+        {
+          "auprc": 0.020503612365205242,
+          "label": 14,
+          "normalized_lift": 0.015779353035384823,
+          "prevalence": 0.004800000227987766
+        },
+        {
+          "auprc": 0.5714304703559396,
+          "label": 15,
+          "normalized_lift": 0.4710977001377458,
+          "prevalence": 0.18970000743865967
+        },
+        {
+          "auprc": 0.8376062269555545,
+          "label": 16,
+          "normalized_lift": 0.6288990701864227,
+          "prevalence": 0.5623999834060669
+        },
+        {
+          "auprc": 0.5836599929118884,
+          "label": 17,
+          "normalized_lift": 0.24589747327925418,
+          "prevalence": 0.4478999972343445
+        },
+        {
+          "auprc": 0.009988662476247858,
+          "label": 18,
+          "normalized_lift": 0.0009976416380338368,
+          "prevalence": 0.008999999612569809
+        },
+        {
+          "auprc": 0.007054243878851445,
+          "label": 19,
+          "normalized_lift": 0.0013620072240469285,
+          "prevalence": 0.00570000009611249
+        },
+        {
+          "auprc": 0.03702802988521999,
+          "label": 20,
+          "normalized_lift": 0.019476662741496797,
+          "prevalence": 0.017899999395012856
+        },
+        {
+          "auprc": 0.01930335475749373,
+          "label": 21,
+          "normalized_lift": 0.014276163007429512,
+          "prevalence": 0.005100000184029341
+        },
+        {
+          "auprc": 0.0011616334237795835,
+          "label": 22,
+          "normalized_lift": 0.00016179517146127834,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.0007222181135588541,
+          "label": 23,
+          "normalized_lift": 2.2233702109220622e-05,
+          "prevalence": 0.000699999975040555
+        },
+        {
+          "auprc": 0.5785793494380711,
+          "label": 24,
+          "normalized_lift": 0.5382197577338,
+          "prevalence": 0.08739999681711197
+        },
+        {
+          "auprc": 0.11791106282880928,
+          "label": 25,
+          "normalized_lift": 0.05487095901759209,
+          "prevalence": 0.06669999659061432
+        },
+        {
+          "auprc": 0.0965790468356885,
+          "label": 26,
+          "normalized_lift": 0.04298627667527233,
+          "prevalence": 0.0560000017285347
+        },
+        {
+          "auprc": 0.000994799425921521,
+          "label": 27,
+          "normalized_lift": -5.205827403581237e-06,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.14626947098393828,
+          "label": 28,
+          "normalized_lift": 0.033476134901497256,
+          "prevalence": 0.11670000106096268
+        },
+        {
+          "auprc": 0.06094392457717386,
+          "label": 29,
+          "normalized_lift": 0.013181930260589742,
+          "prevalence": 0.04839999973773956
+        },
+        {
+          "auprc": 0.021739747922872178,
+          "label": 30,
+          "normalized_lift": 0.012357141064685714,
+          "prevalence": 0.009499999694526196
+        },
+        {
+          "auprc": 0.031605436119802585,
+          "label": 31,
+          "normalized_lift": 0.009213664213503841,
+          "prevalence": 0.022600000724196434
+        },
+        {
+          "auprc": NaN,
+          "label": 32,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.006829748024370056,
+          "label": 33,
+          "normalized_lift": 0.0021398051763541247,
+          "prevalence": 0.004699999932199717
+        },
+        {
+          "auprc": NaN,
+          "label": 34,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.019283179211768937,
+          "label": 35,
+          "normalized_lift": 0.014454003772982008,
+          "prevalence": 0.004900000058114529
+        },
+        {
+          "auprc": 0.011054084394488921,
+          "label": 36,
+          "normalized_lift": 0.00718209466873538,
+          "prevalence": 0.0038999998942017555
+        }
+      ],
+      "seed": 31,
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      },
+      "validation_auprc": 0.24359981586601534
+    },
+    {
+      "acquisition": "C13_NMR",
+      "best_epoch": 15,
+      "fraction": 0.01,
+      "labeled_molecules": 800,
+      "macro_auprc": 0.2332764563597848,
+      "macro_f1": 0.21961986134371497,
+      "per_label": [
+        {
+          "auprc": 0.00224561900723097,
+          "label": 0,
+          "normalized_lift": 0.0007467391028564751,
+          "prevalence": 0.001500000013038516
+        },
+        {
+          "auprc": 0.01469248811258524,
+          "label": 1,
+          "normalized_lift": 0.009243326437518441,
+          "prevalence": 0.005499999970197678
+        },
+        {
+          "auprc": 0.3682765279846805,
+          "label": 2,
+          "normalized_lift": 0.1414467604052476,
+          "prevalence": 0.26420000195503235
+        },
+        {
+          "auprc": 0.27016429075463666,
+          "label": 3,
+          "normalized_lift": 0.25191091749374167,
+          "prevalence": 0.024399999529123306
+        },
+        {
+          "auprc": 0.9947728120661334,
+          "label": 4,
+          "normalized_lift": 0.857956953428928,
+          "prevalence": 0.9631999731063843
+        },
+        {
+          "auprc": 0.1489051876129359,
+          "label": 5,
+          "normalized_lift": 0.03427344816675137,
+          "prevalence": 0.11869999766349792
+        },
+        {
+          "auprc": 0.12550585663841887,
+          "label": 6,
+          "normalized_lift": 0.10911354551209985,
+          "prevalence": 0.018400000408291817
+        },
+        {
+          "auprc": 0.5410396862454512,
+          "label": 7,
+          "normalized_lift": 0.37894408884335845,
+          "prevalence": 0.26100000739097595
+        },
+        {
+          "auprc": 0.5785244536912487,
+          "label": 8,
+          "normalized_lift": 0.2859977117248615,
+          "prevalence": 0.4097000062465668
+        },
+        {
+          "auprc": 0.9359661386663652,
+          "label": 9,
+          "normalized_lift": 0.7282094109288918,
+          "prevalence": 0.7644000053405762
+        },
+        {
+          "auprc": 0.003406571023877099,
+          "label": 10,
+          "normalized_lift": 0.001409389708432947,
+          "prevalence": 0.0020000000949949026
+        },
+        {
+          "auprc": 0.6623346739643851,
+          "label": 11,
+          "normalized_lift": 0.626435084655712,
+          "prevalence": 0.09610000252723694
+        },
+        {
+          "auprc": 0.2766717615542247,
+          "label": 12,
+          "normalized_lift": 0.1963912473248313,
+          "prevalence": 0.09989999979734421
+        },
+        {
+          "auprc": 0.02907399196297584,
+          "label": 13,
+          "normalized_lift": 0.017579674466043586,
+          "prevalence": 0.011699999682605267
+        },
+        {
+          "auprc": 0.01706519052010082,
+          "label": 14,
+          "normalized_lift": 0.012324347161297081,
+          "prevalence": 0.004800000227987766
+        },
+        {
+          "auprc": 0.5773227282199384,
+          "label": 15,
+          "normalized_lift": 0.4783693994072638,
+          "prevalence": 0.18970000743865967
+        },
+        {
+          "auprc": 0.8447135662784602,
+          "label": 16,
+          "normalized_lift": 0.6451407042206846,
+          "prevalence": 0.5623999834060669
+        },
+        {
+          "auprc": 0.5885706801428575,
+          "label": 17,
+          "normalized_lift": 0.2547920344210216,
+          "prevalence": 0.4478999972343445
+        },
+        {
+          "auprc": 0.010261606966977291,
+          "label": 18,
+          "normalized_lift": 0.0012730649383594938,
+          "prevalence": 0.008999999612569809
+        },
+        {
+          "auprc": 0.0061619336314363,
+          "label": 19,
+          "normalized_lift": 0.000464581650777896,
+          "prevalence": 0.00570000009611249
+        },
+        {
+          "auprc": 0.036084786668972114,
+          "label": 20,
+          "normalized_lift": 0.01851622773929048,
+          "prevalence": 0.017899999395012856
+        },
+        {
+          "auprc": 0.006220298723473158,
+          "label": 21,
+          "normalized_lift": 0.0011260413505387898,
+          "prevalence": 0.005100000184029341
+        },
+        {
+          "auprc": 0.0011267309669557863,
+          "label": 22,
+          "normalized_lift": 0.00012685777724160205,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.001360221773501696,
+          "label": 23,
+          "normalized_lift": 0.0006606842774388579,
+          "prevalence": 0.000699999975040555
+        },
+        {
+          "auprc": 0.563713207078119,
+          "label": 24,
+          "normalized_lift": 0.5219298801224662,
+          "prevalence": 0.08739999681711197
+        },
+        {
+          "auprc": 0.14767097379738553,
+          "label": 25,
+          "normalized_lift": 0.08675771660878677,
+          "prevalence": 0.06669999659061432
+        },
+        {
+          "auprc": 0.08808874743372856,
+          "label": 26,
+          "normalized_lift": 0.03399231542791394,
+          "prevalence": 0.0560000017285347
+        },
+        {
+          "auprc": 0.0010890130693272325,
+          "label": 27,
+          "normalized_lift": 8.910212395797133e-05,
+          "prevalence": 0.0010000000474974513
+        },
+        {
+          "auprc": 0.15387467529687848,
+          "label": 28,
+          "normalized_lift": 0.04208612507706058,
+          "prevalence": 0.11670000106096268
+        },
+        {
+          "auprc": 0.06186629224564714,
+          "label": 29,
+          "normalized_lift": 0.014151211122526557,
+          "prevalence": 0.04839999973773956
+        },
+        {
+          "auprc": 0.028122503934569627,
+          "label": 30,
+          "normalized_lift": 0.018801114825139003,
+          "prevalence": 0.009499999694526196
+        },
+        {
+          "auprc": 0.04242117612426288,
+          "label": 31,
+          "normalized_lift": 0.020279491932425602,
+          "prevalence": 0.022600000724196434
+        },
+        {
+          "auprc": NaN,
+          "label": 32,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.004970838200794963,
+          "label": 33,
+          "normalized_lift": 0.0002721172195084868,
+          "prevalence": 0.004699999932199717
+        },
+        {
+          "auprc": NaN,
+          "label": 34,
+          "normalized_lift": NaN,
+          "prevalence": 0.0
+        },
+        {
+          "auprc": 0.02606150590358745,
+          "label": 35,
+          "normalized_lift": 0.02126570781500228,
+          "prevalence": 0.004900000058114529
+        },
+        {
+          "auprc": 0.006329236330345026,
+          "label": 36,
+          "normalized_lift": 0.0024387475513354636,
+          "prevalence": 0.0038999998942017555
+        }
+      ],
+      "seed": 47,
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      },
+      "validation_auprc": 0.23202127909552347
+    }
+  ],
+  "seeds": [
+    11,
+    17,
+    23,
+    31,
+    47
+  ],
+  "tuning": [
+    {
+      "acquisition": "C13_NMR",
+      "candidates": [
+        {
+          "best_epoch": 10,
+          "learning_rate": 0.0003,
+          "validation_auprc": 0.2353437167311366,
+          "weight_decay": 0.001
+        },
+        {
+          "best_epoch": 10,
+          "learning_rate": 0.001,
+          "validation_auprc": 0.23165912773609482,
+          "weight_decay": 0.001
+        }
+      ],
+      "selected_spec": {
+        "learning_rate": 0.0003,
+        "weight_decay": 0.001
+      }
+    }
+  ],
+  "tuning_seed": 17
+}

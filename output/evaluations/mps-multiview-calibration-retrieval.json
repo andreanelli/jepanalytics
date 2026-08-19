@@ -1,0 +1,96 @@
+{
+  "kind": "cross_modal_retrieval",
+  "results": [
+    {
+      "median_rank": 4.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.14285714285714285,
+      "recall_at_10": 0.8928571428571429,
+      "recall_at_5": 0.6071428571428571,
+      "source_acquisition": 0,
+      "target_acquisition": 1
+    },
+    {
+      "median_rank": 4.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.21428571428571427,
+      "recall_at_10": 0.8928571428571429,
+      "recall_at_5": 0.5357142857142857,
+      "source_acquisition": 0,
+      "target_acquisition": 2
+    },
+    {
+      "median_rank": 19.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.07142857142857142,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 0,
+      "target_acquisition": 3
+    },
+    {
+      "median_rank": 17.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.14285714285714285,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 0,
+      "target_acquisition": 4
+    },
+    {
+      "median_rank": 4.0,
+      "queries_with_match": 28,
+      "recall_at_1": 0.17857142857142858,
+      "recall_at_10": 0.9285714285714286,
+      "recall_at_5": 0.6428571428571429,
+      "source_acquisition": 1,
+      "target_acquisition": 2
+    },
+    {
+      "median_rank": 21.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.07142857142857142,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 1,
+      "target_acquisition": 3
+    },
+    {
+      "median_rank": 20.0,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.10714285714285714,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 1,
+      "target_acquisition": 4
+    },
+    {
+      "median_rank": 19.5,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.07142857142857142,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 2,
+      "target_acquisition": 3
+    },
+    {
+      "median_rank": 18.0,
+      "queries_with_match": 28,
+      "recall_at_1": 0.03571428571428571,
+      "recall_at_10": 0.17857142857142858,
+      "recall_at_5": 0.07142857142857142,
+      "source_acquisition": 2,
+      "target_acquisition": 4
+    },
+    {
+      "median_rank": 8.0,
+      "queries_with_match": 28,
+      "recall_at_1": 0.14285714285714285,
+      "recall_at_10": 0.6428571428571429,
+      "recall_at_5": 0.39285714285714285,
+      "source_acquisition": 3,
+      "target_acquisition": 4
+    }
+  ],
+  "split": "test"
+}

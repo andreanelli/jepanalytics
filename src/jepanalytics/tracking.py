@@ -15,6 +15,8 @@ def _wandb_metrics(record: Mapping[str, Any]) -> dict[str, float]:
     mapping = {
         "loss": "train/total_loss",
         "jepa_loss": "train/jepa_loss",
+        "summary_jepa_loss": "train/summary_jepa_loss",
+        "chemistry_loss": "train/chemistry_loss",
         "alignment_loss": "train/alignment_loss",
         "alignment_positive_cosine": "alignment/positive_cosine",
         "alignment_negative_cosine": "alignment/negative_cosine",
@@ -34,6 +36,7 @@ def _wandb_metrics(record: Mapping[str, Any]) -> dict[str, float]:
         "aligned_effective_rank": "representation/aligned_effective_rank",
         "collapsed": "representation/collapse_flag",
         "target_signal_residual_norm": "representation/target_signal_residual_norm",
+        "target_summary_signal_residual_norm": "representation/target_summary_signal_residual_norm",
         "masked_fraction": "data/masked_fraction",
         "learning_rate": "optimization/learning_rate",
         "gradient_norm": "optimization/gradient_norm",

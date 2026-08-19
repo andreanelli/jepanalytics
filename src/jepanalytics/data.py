@@ -15,7 +15,7 @@ from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 
 from .preprocessing import ProcessedSignal, SignalProcessor
 from .signal import AcquisitionFamily, AxisType, AxisUnit, SpectralSignal, default_axis
@@ -163,7 +163,14 @@ class CanonicalStoreWriter:
 
 
 class CanonicalSpectraDataset(Dataset[dict[str, torch.Tensor]]):
-    def __init__(self, root: str | Path, split: str | None = None) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        split: str | None = None,
+        *,
+        molecule_targets: np.ndarray | None = None,
+        molecule_matching_targets: np.ndarray | None = None,
+    ) -> None:
         self.root = Path(root)
         self.manifest = json.loads((self.root / "manifest.json").read_text())
         self.vocabularies = json.loads((self.root / "vocabularies.json").read_text())
@@ -172,6 +179,16 @@ class CanonicalSpectraDataset(Dataset[dict[str, torch.Tensor]]):
             name.removesuffix(".npy"): np.load(self.root / name, mmap_mode="r")
             for name in array_names
         }
+        self.molecule_targets = molecule_targets
+        self.molecule_matching_targets = molecule_matching_targets
+        if molecule_targets is not None and molecule_targets.shape[0] != len(
+            self.vocabularies["molecules"]
+        ):
+            raise ValueError("molecule target rows must match the molecule vocabulary")
+        if molecule_matching_targets is not None and molecule_matching_targets.shape[0] != len(
+            self.vocabularies["molecules"]
+        ):
+            raise ValueError("molecule matching rows must match the molecule vocabulary")
         if split is None:
             self.indices = np.arange(self.manifest["n_records"], dtype=np.int64)
         else:
@@ -201,6 +218,18 @@ class CanonicalSpectraDataset(Dataset[dict[str, torch.Tensor]]):
             item["labels"] = torch.tensor(self.arrays["labels"][row], dtype=torch.float32)
             item["label_available"] = torch.tensor(
                 bool(self.arrays["label_available"][row]), dtype=torch.bool
+            )
+        if self.molecule_targets is not None:
+            item["chemistry_target"] = torch.tensor(
+                self.molecule_targets[int(self.arrays["molecule_index"][row])],
+                dtype=torch.float32,
+            )
+        if self.molecule_matching_targets is not None:
+            item["prototype_matching_target"] = torch.tensor(
+                self.molecule_matching_targets[
+                    int(self.arrays["molecule_index"][row])
+                ],
+                dtype=torch.float32,
             )
         return item
 
@@ -283,11 +312,15 @@ class MultiViewSpectrumDataset(Dataset[list[dict[str, torch.Tensor]]]):
             molecule = int(base.arrays["molecule_index"][row])
             acquisition = int(base.arrays["acquisition"][row])
             grouped[molecule][acquisition].append(local_index)
-        self.groups = [
-            dict(families)
-            for families in grouped.values()
+        retained = [
+            (molecule, dict(families))
+            for molecule, families in grouped.items()
             if len(families) >= views_per_molecule
         ]
+        self.molecule_indices = np.asarray(
+            [molecule for molecule, _families in retained], dtype=np.int64
+        )
+        self.groups = [families for _molecule, families in retained]
         if not self.groups:
             raise ValueError("no molecule has enough acquisition families for multi-view training")
         self.view_schedules = []
@@ -312,6 +345,65 @@ class MultiViewSpectrumDataset(Dataset[list[dict[str, torch.Tensor]]]):
             self.seed + self.epoch * len(self.groups) + index * 9973
         )
         return [self.base[rng.choice(families[acquisition])] for acquisition in acquisitions]
+
+
+class FormulaMassBatchSampler(Sampler[list[int]]):
+    """Form unique-molecule batches within local molecular-mass windows.
+
+    Sorting by the fixed mass feature is O(N log N), unlike an all-pairs formula
+    search. Shuffling inside nearby windows changes batches between epochs while
+    preserving mass-matched candidates for the in-batch composition search.
+    """
+
+    def __init__(
+        self,
+        molecule_indices: np.ndarray,
+        matching_targets: np.ndarray,
+        *,
+        batch_size: int,
+        seed: int,
+        window_batches: int = 4,
+        drop_last: bool = True,
+    ) -> None:
+        if batch_size < 2 or window_batches < 1:
+            raise ValueError("batch_size and window_batches must be valid")
+        molecules = np.asarray(molecule_indices, dtype=np.int64)
+        features = np.asarray(matching_targets, dtype=np.float32)
+        if molecules.ndim != 1 or features.ndim != 2:
+            raise ValueError("molecule indices and matching targets have invalid shapes")
+        if not molecules.size or molecules.max() >= features.shape[0]:
+            raise ValueError("matching targets do not cover every sampled molecule")
+        self.mass = features[molecules, -1]
+        self.batch_size = batch_size
+        self.seed = seed
+        self.window_size = batch_size * window_batches
+        self.drop_last = drop_last
+        self.epoch = 0
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = epoch
+
+    def __len__(self) -> int:
+        if self.drop_last:
+            return self.mass.size // self.batch_size
+        return math.ceil(self.mass.size / self.batch_size)
+
+    def __iter__(self) -> Iterator[list[int]]:
+        rng = np.random.default_rng(self.seed + self.epoch * 104729)
+        order = np.argsort(self.mass, kind="stable")
+        windows = [
+            order[start : start + self.window_size].copy()
+            for start in range(0, order.size, self.window_size)
+        ]
+        for window in windows:
+            rng.shuffle(window)
+        rng.shuffle(windows)
+        shuffled = np.concatenate(windows)
+        for start in range(0, shuffled.size, self.batch_size):
+            batch = shuffled[start : start + self.batch_size]
+            if batch.size < self.batch_size and self.drop_last:
+                continue
+            yield batch.tolist()
 
 
 def paired_collate(

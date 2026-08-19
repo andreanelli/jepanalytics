@@ -15,12 +15,15 @@ from typing import Any, Mapping
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .augment import SpectralAugmenter
+from .chemistry import formula_matching_features, load_formula_targets
 from .config import TrainingConfig, save_config
 from .data import (
     CanonicalSpectraDataset,
+    FormulaMassBatchSampler,
     MultiViewSpectrumDataset,
     PairedSpectrumDataset,
     multiview_collate,
@@ -31,6 +34,8 @@ from .losses import (
     covariance_regularization,
     embedding_diagnostics,
     group_centroid_regularization,
+    hard_negative_prototype_alignment_loss,
+    latent_vector_loss,
     masked_latent_loss,
     modality_centroid_alignment_loss,
     multi_positive_alignment_loss,
@@ -41,7 +46,13 @@ from .losses import (
 )
 from .manifest import build_run_manifest, sha256_file, write_json_atomic
 from .masking import mixed_patch_mask
-from .model import LatentPredictor, UniversalSpectrumEncoder, batch_to_encoder_kwargs
+from .model import (
+    ChemistryPredictor,
+    LatentPredictor,
+    SummaryLatentPredictor,
+    UniversalSpectrumEncoder,
+    batch_to_encoder_kwargs,
+)
 from .tracking import WandbTracker
 
 
@@ -67,6 +78,77 @@ def move_batch(batch: Mapping[str, torch.Tensor], device: torch.device) -> dict[
     return {key: value.to(device, non_blocking=True) for key, value in batch.items()}
 
 
+def jepa_token_mask(
+    intensity: torch.Tensor, config: Any, mask_ratio: float
+) -> torch.Tensor:
+    """Mask dense signal tokens while reserving hybrid peak tokens as context."""
+
+    dense_count = config.dense_token_count
+    if dense_count == config.n_patches:
+        scores = intensity.unfold(
+            1, config.patch_size, config.patch_size
+        ).abs().amax(dim=-1)
+    else:
+        scores = F.adaptive_max_pool1d(
+            intensity.abs().unsqueeze(1), dense_count
+        ).squeeze(1)
+    dense_mask = mixed_patch_mask(scores, mask_ratio)
+    if dense_count == config.n_patches:
+        return dense_mask
+    peak_context = torch.zeros(
+        intensity.shape[0],
+        config.n_patches - dense_count,
+        dtype=torch.bool,
+        device=intensity.device,
+    )
+    return torch.cat((dense_mask, peak_context), dim=1)
+
+
+def dense_mask_fraction(mask: torch.Tensor, config: Any) -> float:
+    return float(mask[:, : config.dense_token_count].float().mean())
+
+
+TOKENIZER_STATE_PREFIXES = (
+    "patch_projection.",
+    "overlap_projection.",
+    "multiscale_projections.",
+    "peak_projection.",
+    "peak_metadata_projection.",
+    "token_type_embedding.",
+)
+
+
+def warm_start_encoder(
+    encoder: UniversalSpectrumEncoder,
+    state: Mapping[str, torch.Tensor],
+) -> dict[str, Any]:
+    """Load all compatible backbone weights while allowing tokenizer replacement."""
+
+    destination = encoder.state_dict()
+    compatible = {
+        key: value
+        for key, value in state.items()
+        if key in destination and destination[key].shape == value.shape
+    }
+    missing, unexpected = encoder.load_state_dict(compatible, strict=False)
+    invalid_missing = [
+        key
+        for key in missing
+        if not key.startswith(TOKENIZER_STATE_PREFIXES)
+    ]
+    if invalid_missing or unexpected:
+        raise RuntimeError(
+            "warm-start state mismatch; "
+            f"missing={invalid_missing}, unexpected={list(unexpected)}"
+        )
+    ignored = sorted(set(state) - set(compatible))
+    return {
+        "loaded_keys": len(compatible),
+        "ignored_keys": ignored,
+        "initialized_keys": sorted(missing),
+    }
+
+
 class JEPAExperiment(nn.Module):
     def __init__(self, config: TrainingConfig) -> None:
         super().__init__()
@@ -76,6 +158,12 @@ class JEPAExperiment(nn.Module):
         self.target.requires_grad_(False)
         self.target.eval()
         self.predictor = LatentPredictor(hidden_dim=config.encoder.hidden_dim)
+        self.summary_predictor = SummaryLatentPredictor(
+            hidden_dim=config.encoder.hidden_dim
+        )
+        self.chemistry_predictor = ChemistryPredictor(
+            config.encoder.hidden_dim, config.chemistry_target_dim
+        )
         self.augment = SpectralAugmenter(config.augmentation)
 
     def train(self, mode: bool = True) -> "JEPAExperiment":
@@ -91,20 +179,39 @@ class JEPAExperiment(nn.Module):
 
     def _side(
         self, batch: Mapping[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, Any, Any, torch.Tensor, torch.Tensor]:
-        context = self.augment(batch["intensity"], light=False)
-        target_intensity = self.augment(batch["intensity"], light=True)
-        patches = context.unfold(
-            1, self.config.encoder.patch_size, self.config.encoder.patch_size
-        ).abs().amax(dim=-1)
-        mask = mixed_patch_mask(patches, self.config.mask_ratio)
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        Any,
+        Any,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        context = self.augment(
+            batch["intensity"], light=False, acquisition=batch["acquisition"]
+        )
+        target_intensity = self.augment(
+            batch["intensity"], light=True, acquisition=batch["acquisition"]
+        )
+        mask = jepa_token_mask(
+            context, self.config.encoder, self.config.mask_ratio
+        )
         context_kwargs = {
             **batch_to_encoder_kwargs(batch),
             "intensity": context,
             "patch_mask": mask,
         }
         online = self.online(**context_kwargs)
-        if self.config.alignment_weight > 0 and self.config.alignment_clean_view:
+        needs_clean_online = (
+            self.config.alignment_weight > 0 and self.config.alignment_clean_view
+        ) or (
+            self.config.prototype_alignment_weight > 0
+            and self.config.prototype_clean_view
+        )
+        if needs_clean_online:
             alignment_embedding = self.online(
                 **{
                     **batch_to_encoder_kwargs(batch),
@@ -131,14 +238,35 @@ class JEPAExperiment(nn.Module):
             # predictable without looking at the spectrum.  Predict the latent
             # change caused by intensity so a metadata-only solution has loss 2.
             target_patches = target.patches - metadata_only.patches
+            target_summary = target.general - metadata_only.general
         prediction = self.predictor(online.patches)
+        summary_prediction = self.summary_predictor(online.general)
         residual_norm = target_patches[mask].norm(dim=-1).mean()
+        summary_residual_norm = target_summary.norm(dim=-1).mean()
+        if self.config.chemistry_weight > 0:
+            if "chemistry_target" not in batch:
+                raise ValueError("chemistry_weight requires chemistry targets in each batch")
+            chemistry_embedding = (
+                alignment_embedding
+                if self.config.chemistry_clean_view
+                else online
+            )
+            chemistry = nn.functional.smooth_l1_loss(
+                self.chemistry_predictor(chemistry_embedding.general),
+                batch["chemistry_target"],
+            )
+        else:
+            chemistry = online.general.new_zeros(())
         return (
             masked_latent_loss(prediction, target_patches, mask),
+            latent_vector_loss(summary_prediction, target_summary),
+            chemistry,
             online,
             alignment_embedding,
+            target.general,
             mask,
             residual_norm,
+            summary_residual_norm,
         )
 
     def forward(
@@ -146,19 +274,29 @@ class JEPAExperiment(nn.Module):
     ) -> tuple[torch.Tensor, dict[str, float]]:
         (
             first_jepa,
+            first_summary_jepa,
+            first_chemistry,
             _first_context_embedding,
             first_embedding,
+            _first_target_general,
             first_mask,
             first_residual_norm,
+            first_summary_residual_norm,
         ) = self._side(first)
         (
             second_jepa,
+            second_summary_jepa,
+            second_chemistry,
             _second_context_embedding,
             second_embedding,
+            _second_target_general,
             second_mask,
             second_residual_norm,
+            second_summary_residual_norm,
         ) = self._side(second)
         jepa = 0.5 * (first_jepa + second_jepa)
+        summary_jepa = 0.5 * (first_summary_jepa + second_summary_jepa)
+        chemistry = 0.5 * (first_chemistry + second_chemistry)
         joint_aligned = self.online.normalize_alignment_logits(
             torch.cat(
                 (first_embedding.alignment_logits, second_embedding.alignment_logits),
@@ -189,12 +327,15 @@ class JEPAExperiment(nn.Module):
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
-        if diagnostics.collapsed:
-            general_variance = variance_regularization(combined)
-            general_covariance = covariance_regularization(combined)
-        else:
-            general_variance = combined.new_zeros(())
-            general_covariance = combined.new_zeros(())
+        # The general embedding leaves a LayerNorm, so per-sample feature
+        # statistics are healthy by construction and the collapse detector this
+        # term used to be gated on never fired: across the whole 100k run the
+        # weighted variance and covariance contribution was exactly zero.  The
+        # representation every downstream probe reads therefore had no active
+        # decorrelation pressure at all.  Apply it unconditionally and let
+        # variance_weight control its strength.
+        general_variance = variance_regularization(combined)
+        general_covariance = covariance_regularization(combined)
         aligned_variance = aligned_combined.new_zeros(())
         aligned_covariance = aligned_combined.new_zeros(())
         alignment_centroid = aligned_combined.new_zeros(())
@@ -224,6 +365,8 @@ class JEPAExperiment(nn.Module):
             )
         total = (
             jepa
+            + self.config.summary_jepa_weight * summary_jepa
+            + self.config.chemistry_weight * chemistry
             + self.config.alignment_weight * alignment
             + self.config.variance_weight * (general_variance + general_covariance)
             + self.config.alignment_uniformity_weight * alignment_uniformity
@@ -237,6 +380,8 @@ class JEPAExperiment(nn.Module):
         metrics = {
             "loss": float(total.detach()),
             "jepa_loss": float(jepa.detach()),
+            "summary_jepa_loss": float(summary_jepa.detach()),
+            "chemistry_loss": float(chemistry.detach()),
             "alignment_loss": float(alignment.detach()),
             "variance_loss": float((general_variance + aligned_variance).detach()),
             "covariance_loss": float((general_covariance + aligned_covariance).detach()),
@@ -248,13 +393,30 @@ class JEPAExperiment(nn.Module):
             "embedding_std": diagnostics.mean_feature_std,
             "effective_rank": diagnostics.effective_rank,
             "aligned_embedding_std": aligned_diagnostics.mean_feature_std,
+            # An L2-normalized d-dimensional embedding caps the mean
+            # per-feature std at 1/sqrt(d).  Logging that reference makes
+            # it obvious how much headroom alignment_target_std leaves.
+            "aligned_isotropic_std": self.config.encoder.aligned_dim ** -0.5,
             "aligned_effective_rank": aligned_diagnostics.effective_rank,
             "collapsed": float(diagnostics.collapsed or aligned_diagnostics.collapsed),
             "masked_fraction": float(
-                torch.cat((first_mask.flatten(), second_mask.flatten())).float().mean()
+                0.5
+                * (
+                    dense_mask_fraction(first_mask, self.config.encoder)
+                    + dense_mask_fraction(second_mask, self.config.encoder)
+                )
+            ),
+            "dense_token_count": float(self.config.encoder.dense_token_count),
+            "peak_token_count": float(
+                self.config.encoder.n_patches
+                - self.config.encoder.dense_token_count
             ),
             "target_signal_residual_norm": float(
                 0.5 * (first_residual_norm + second_residual_norm)
+            ),
+            "target_summary_signal_residual_norm": float(
+                0.5
+                * (first_summary_residual_norm + second_summary_residual_norm)
             ),
             **alignment_metrics,
         }
@@ -275,7 +437,17 @@ class JEPAExperiment(nn.Module):
     def forward_multiview(
         self, batch: Mapping[str, torch.Tensor]
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        jepa, _context_embedding, embedding, mask, residual_norm = self._side(batch)
+        (
+            jepa,
+            summary_jepa,
+            chemistry,
+            _context_embedding,
+            embedding,
+            target_general,
+            mask,
+            residual_norm,
+            summary_residual_norm,
+        ) = self._side(batch)
         aligned = self.online.normalize_alignment_logits(
             embedding.alignment_logits, update_stats=True
         )
@@ -284,6 +456,29 @@ class JEPAExperiment(nn.Module):
             batch["molecule_index"],
             self.config.alignment_temperature,
         )
+        if self.config.prototype_alignment_weight > 0:
+            if "prototype_matching_target" not in batch:
+                raise ValueError(
+                    "prototype alignment requires formula/mass matching targets"
+                )
+            prototype, prototype_metrics = hard_negative_prototype_alignment_loss(
+                embedding.general,
+                target_general,
+                batch["molecule_index"],
+                batch["prototype_matching_target"],
+                temperature=self.config.prototype_temperature,
+                hard_negatives=self.config.prototype_hard_negatives,
+            )
+        else:
+            prototype = embedding.general.new_zeros(())
+            prototype_metrics = {
+                "prototype_positive_cosine": 0.0,
+                "prototype_hard_negative_cosine": 0.0,
+                "prototype_cosine_margin": 0.0,
+                "prototype_batch_top1": 0.0,
+                "prototype_hard_negative_distance": 0.0,
+                "prototype_negatives_per_anchor": 0.0,
+            }
         general_diagnostics = embedding_diagnostics(
             embedding.general,
             min_std=self.config.collapse_min_std,
@@ -294,12 +489,10 @@ class JEPAExperiment(nn.Module):
             min_std=self.config.collapse_min_std,
             min_effective_rank=self.config.collapse_min_rank,
         )
-        if general_diagnostics.collapsed:
-            general_variance = variance_regularization(embedding.general)
-            general_covariance = covariance_regularization(embedding.general)
-        else:
-            general_variance = aligned.new_zeros(())
-            general_covariance = aligned.new_zeros(())
+        # Applied unconditionally: see the two-view path for why gating this on
+        # the collapse detector made it dead code.
+        general_variance = variance_regularization(embedding.general)
+        general_covariance = covariance_regularization(embedding.general)
         aligned_variance = variance_regularization(
             aligned, target_std=self.config.alignment_target_std
         )
@@ -318,14 +511,20 @@ class JEPAExperiment(nn.Module):
         )
         total = (
             jepa
+            + self.config.summary_jepa_weight * summary_jepa
+            + self.config.chemistry_weight * chemistry
             + self.config.alignment_weight * alignment
+            + self.config.prototype_alignment_weight * prototype
             + self.config.variance_weight * (general_variance + general_covariance)
             + self.config.alignment_uniformity_weight * alignment_uniformity
         )
         metrics = {
             "loss": float(total.detach()),
             "jepa_loss": float(jepa.detach()),
+            "summary_jepa_loss": float(summary_jepa.detach()),
+            "chemistry_loss": float(chemistry.detach()),
             "alignment_loss": float(alignment.detach()),
+            "prototype_alignment_loss": float(prototype.detach()),
             "variance_loss": float((general_variance + aligned_variance).detach()),
             "covariance_loss": float(
                 (general_covariance + aligned_covariance).detach()
@@ -338,12 +537,22 @@ class JEPAExperiment(nn.Module):
             "embedding_std": general_diagnostics.mean_feature_std,
             "effective_rank": general_diagnostics.effective_rank,
             "aligned_embedding_std": aligned_diagnostics.mean_feature_std,
+            # An L2-normalized d-dimensional embedding caps the mean
+            # per-feature std at 1/sqrt(d).  Logging that reference makes
+            # it obvious how much headroom alignment_target_std leaves.
+            "aligned_isotropic_std": self.config.encoder.aligned_dim ** -0.5,
             "aligned_effective_rank": aligned_diagnostics.effective_rank,
             "collapsed": float(
                 general_diagnostics.collapsed or aligned_diagnostics.collapsed
             ),
-            "masked_fraction": float(mask.float().mean()),
+            "masked_fraction": dense_mask_fraction(mask, self.config.encoder),
+            "dense_token_count": float(self.config.encoder.dense_token_count),
+            "peak_token_count": float(
+                self.config.encoder.n_patches
+                - self.config.encoder.dense_token_count
+            ),
             "target_signal_residual_norm": float(residual_norm),
+            "target_summary_signal_residual_norm": float(summary_residual_norm),
             **multiview_alignment_diagnostics(
                 aligned, batch["molecule_index"]
             ),
@@ -352,6 +561,7 @@ class JEPAExperiment(nn.Module):
                 batch["molecule_index"],
                 batch["acquisition"],
             ),
+            **prototype_metrics,
         }
         molecule = batch["molecule_index"]
         acquisition = batch["acquisition"]
@@ -400,7 +610,9 @@ class MaskedAutoencoderExperiment(nn.Module):
         embeddings = []
         masks = []
         for batch in (first, second):
-            intensity = self.augment(batch["intensity"], light=False)
+            intensity = self.augment(
+                batch["intensity"], light=False, acquisition=batch["acquisition"]
+            )
             raw_patches = batch["intensity"].unfold(
                 1, self.config.encoder.patch_size, self.config.encoder.patch_size
             )
@@ -440,6 +652,24 @@ def _filter_acquisition(
         ]
     if not len(dataset):
         raise ValueError("acquisition filtering removed every training record")
+
+
+def _limit_molecules(
+    dataset: CanonicalSpectraDataset,
+    maximum: int | None,
+    *,
+    seed: int,
+) -> None:
+    """Deterministically retain complete molecule groups for bounded calibrations."""
+
+    if maximum is None:
+        return
+    molecules = np.asarray(dataset.arrays["molecule_index"][dataset.indices])
+    unique = np.unique(molecules)
+    if unique.size <= maximum:
+        return
+    selected = np.random.default_rng(seed).choice(unique, size=maximum, replace=False)
+    dataset.indices = dataset.indices[np.isin(molecules, selected)]
 
 
 def _atomic_checkpoint(payload: Mapping[str, Any], path: Path) -> None:
@@ -502,10 +732,29 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
     output = Path(config.output_dir)
     output.mkdir(parents=True, exist_ok=True)
     save_config(config, output / "config.json")
-    dataset = CanonicalSpectraDataset(config.data_root, split="train")
+    chemistry_targets = None
+    matching_targets = None
+    chemistry_manifest = None
+    if config.chemistry_target_root:
+        chemistry_targets, chemistry_manifest = load_formula_targets(
+            config.chemistry_target_root, config.data_root
+        )
+        if chemistry_targets.shape[1] != config.chemistry_target_dim:
+            raise ValueError("chemistry target dimension does not match training config")
+        if config.prototype_alignment_weight > 0:
+            matching_targets = formula_matching_features(
+                chemistry_targets, chemistry_manifest
+            )
+    dataset = CanonicalSpectraDataset(
+        config.data_root,
+        split="train",
+        molecule_targets=chemistry_targets,
+        molecule_matching_targets=matching_targets,
+    )
     if dataset.manifest["n_bins"] != config.encoder.n_bins:
         raise ValueError("dataset n_bins does not match encoder configuration")
     _filter_acquisition(dataset, config.acquisition, config.excluded_acquisitions)
+    _limit_molecules(dataset, config.max_train_molecules, seed=config.seed)
     if config.views_per_molecule > 2:
         sampled: PairedSpectrumDataset | MultiViewSpectrumDataset = (
             MultiViewSpectrumDataset(
@@ -519,18 +768,53 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
         sampled = PairedSpectrumDataset(dataset, seed=config.seed)
         collate = paired_collate
     loader_generator = torch.Generator().manual_seed(config.seed)
-    loader = DataLoader(
-        sampled,
-        batch_size=config.batch_size,
-        shuffle=True,
-        generator=loader_generator,
-        num_workers=config.num_workers,
-        collate_fn=collate,
-        drop_last=len(sampled) >= config.batch_size,
-        pin_memory=device.type == "cuda",
-    )
+    matched_batch_sampler = None
+    if config.prototype_alignment_weight > 0:
+        if not isinstance(sampled, MultiViewSpectrumDataset) or matching_targets is None:
+            raise ValueError("prototype alignment requires multi-view matching targets")
+        matched_batch_sampler = FormulaMassBatchSampler(
+            sampled.molecule_indices,
+            matching_targets,
+            batch_size=config.batch_size,
+            seed=config.seed,
+            drop_last=len(sampled) >= config.batch_size,
+        )
+        loader = DataLoader(
+            sampled,
+            batch_sampler=matched_batch_sampler,
+            num_workers=config.num_workers,
+            collate_fn=collate,
+            pin_memory=device.type == "cuda",
+        )
+    else:
+        loader = DataLoader(
+            sampled,
+            batch_size=config.batch_size,
+            shuffle=True,
+            generator=loader_generator,
+            num_workers=config.num_workers,
+            collate_fn=collate,
+            drop_last=len(sampled) >= config.batch_size,
+            pin_memory=device.type == "cuda",
+        )
     experiment: JEPAExperiment | MaskedAutoencoderExperiment
     experiment = JEPAExperiment(config) if config.objective == "jepa" else MaskedAutoencoderExperiment(config)
+    initialized_from: dict[str, Any] | None = None
+    if config.initialize_from:
+        initialization_path = Path(config.initialize_from)
+        initialization = torch.load(
+            initialization_path, map_location="cpu", weights_only=False
+        )
+        warm_start = warm_start_encoder(
+            experiment.online, initialization["online_encoder"]
+        )
+        if isinstance(experiment, JEPAExperiment):
+            experiment.target.load_state_dict(experiment.online.state_dict())
+        initialized_from = {
+            "path": str(initialization_path.resolve()),
+            "sha256": sha256_file(initialization_path),
+            **warm_start,
+        }
     experiment.to(device)
     parameters = [parameter for parameter in experiment.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(
@@ -545,6 +829,10 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
         dataset_manifest=Path(config.data_root) / "manifest.json",
         repository=repository,
     )
+    if initialized_from is not None:
+        manifest["initialized_from"] = initialized_from
+    if chemistry_manifest is not None:
+        manifest["chemistry_targets"] = chemistry_manifest
     write_json_atomic(manifest, output / "run_manifest.json")
     metrics_path = output / "metrics.jsonl"
     global_step = 0
@@ -596,6 +884,8 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
     with metrics_path.open(metrics_mode) as metrics_file:
         for epoch in range(start_epoch, config.epochs):
             sampled.set_epoch(epoch)
+            if matched_batch_sampler is not None:
+                matched_batch_sampler.set_epoch(epoch)
             experiment.train()
             running = 0.0
             for batch_index, loaded_batch in enumerate(loader):
@@ -675,6 +965,10 @@ def train(config: TrainingConfig, *, repository: str | Path | None = None) -> Pa
                 _atomic_checkpoint(checkpoint, output / "best.pt")
             if (epoch + 1) % config.checkpoint_every == 0:
                 _atomic_checkpoint(checkpoint, output / "last.pt")
+            if (epoch + 1) in config.snapshot_epochs:
+                _atomic_checkpoint(
+                    checkpoint, output / f"epoch-{epoch + 1:04d}.pt"
+                )
             tracker.log_epoch(
                 epoch=epoch,
                 global_step=max(0, global_step - 1),

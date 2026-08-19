@@ -1,0 +1,139 @@
+{
+  "kind": "scaling_continuation_gate",
+  "run": "/Users/rebgasse/git/jepanalytics/runs/pilot-fixed-maskrepair-100k-12ep",
+  "status": "stop_epoch_scaling",
+  "selected_epoch": 8,
+  "primary_protocol": "800 labeled molecules per acquisition family; five fixed seeds; frozen general embedding",
+  "epoch_macro_auprc": {
+    "2": 0.18425925804532423,
+    "4": 0.18750061256069706,
+    "8": 0.18889162623681116,
+    "12": 0.18890221277468058
+  },
+  "epoch8_to_epoch12_delta": 1.0586537869432533e-05,
+  "epoch8_to_epoch12_bootstrap_95ci": [
+    -0.00039670915950794155,
+    0.0004207568814707617
+  ],
+  "required_delta": 0.003,
+  "family_delta_epoch12_vs_epoch8": {
+    "IR": -1.4742481892676684e-05,
+    "H1_NMR": 0.00013006613303892522,
+    "C13_NMR": 0.000921601233009467,
+    "MSMS_POSITIVE": -0.00021796792342526627,
+    "MSMS_NEGATIVE": -0.0007660242713833088
+  },
+  "earlier_repaired_10k_macro_auprc": 0.18317207518161654,
+  "epoch8_delta_vs_earlier_repaired_10k": 0.005719551055194616,
+  "massbank": {
+    "MSMS_POSITIVE": {
+      "all": {
+        "scaled_mean": 0.13572102422154902,
+        "repaired_mean": 0.13945225634087316,
+        "random_mean": 0.1346801266121586,
+        "delta_vs_repaired": -0.0037312321193241236,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.0062418564800075125,
+          -0.001220607758640735
+        ],
+        "delta_vs_random": 0.0010408976093904232,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.005715825913378348,
+          0.0077976211321591936
+        ]
+      },
+      "exact_molecule_unseen": {
+        "scaled_mean": 0.13587587097938375,
+        "repaired_mean": 0.13956771817057267,
+        "random_mean": 0.13495866899324668,
+        "delta_vs_repaired": -0.003691847191188924,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.006129640494850336,
+          -0.001254053887527512
+        ],
+        "delta_vs_random": 0.0009172019861370617,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.005772973360739214,
+          0.007607377333013338
+        ]
+      },
+      "scaffold_unseen": {
+        "scaled_mean": 0.13951777283137043,
+        "repaired_mean": 0.14377292041003797,
+        "random_mean": 0.1378107469823152,
+        "delta_vs_repaired": -0.0042551475786675565,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.006730190545068443,
+          -0.00152989305781344
+        ],
+        "delta_vs_random": 0.0017070258490552103,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.004732951328141177,
+          0.008147003026251598
+        ]
+      }
+    },
+    "MSMS_NEGATIVE": {
+      "all": {
+        "scaled_mean": 0.14722328020899195,
+        "repaired_mean": 0.15192367035889634,
+        "random_mean": 0.14653277361118597,
+        "delta_vs_repaired": -0.004700390149904382,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.007188624526091353,
+          -0.0015621484044693545
+        ],
+        "delta_vs_random": 0.0006905065978059733,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.011351181687388762,
+          0.0070553599915348705
+        ]
+      },
+      "exact_molecule_unseen": {
+        "scaled_mean": 0.1472331934169197,
+        "repaired_mean": 0.15194268028625801,
+        "random_mean": 0.1467068582328777,
+        "delta_vs_repaired": -0.004709486869338292,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.007201050732919029,
+          -0.0015911269549665542
+        ],
+        "delta_vs_random": 0.000526335184042026,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.011552794959243029,
+          0.0067489309007538415
+        ]
+      },
+      "scaffold_unseen": {
+        "scaled_mean": 0.14944454796257986,
+        "repaired_mean": 0.15503028549131362,
+        "random_mean": 0.1465401062998232,
+        "delta_vs_repaired": -0.00558573752873377,
+        "delta_vs_repaired_bootstrap_95ci": [
+          -0.008021395460611197,
+          -0.0030009165843208176
+        ],
+        "delta_vs_random": 0.0029044416627566406,
+        "delta_vs_random_bootstrap_95ci": [
+          -0.01059831091643677,
+          0.011517523475729869
+        ]
+      }
+    }
+  },
+  "visual_diagnostics": {
+    "general": {
+      "trustworthiness_at_15": 0.9965296681969171,
+      "pca_variance_50": 0.9971758723258972,
+      "map_knn15_acquisition_agreement": 0.7990666666666667,
+      "map_knn15_label_jaccard": 0.4057418344001677
+    },
+    "aligned": {
+      "trustworthiness_at_15": 0.9901480237375434,
+      "pca_variance_50": 0.9726184606552124,
+      "map_knn15_acquisition_agreement": 0.4256666666666667,
+      "map_knn15_label_jaccard": 0.4217674876974877
+    }
+  },
+  "checkpoint_sha256": "2987ba8a69745f2dd29a37cad940f710fdf304039a568b883675e22c83dbb660"
+}

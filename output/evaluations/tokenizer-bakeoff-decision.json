@@ -1,0 +1,256 @@
+{
+  "advance_rule": {
+    "family_regression_floor": -0.005,
+    "ms_mean_must_not_regress": true,
+    "spectroscopy_mean_delta_minimum": 0.01
+  },
+  "decision": "no_advance",
+  "kind": "tokenizer_bakeoff_decision",
+  "models": {
+    "fixed_mask_repair": {
+      "family_delta_bootstrap_95ci": {
+        "C13_NMR": [
+          0.0,
+          0.0
+        ],
+        "H1_NMR": [
+          0.0,
+          0.0
+        ],
+        "IR": [
+          0.0,
+          0.0
+        ],
+        "MSMS_NEGATIVE": [
+          0.0,
+          0.0
+        ],
+        "MSMS_POSITIVE": [
+          0.0,
+          0.0
+        ]
+      },
+      "family_delta_vs_fixed": {
+        "C13_NMR": 0.0,
+        "H1_NMR": 0.0,
+        "IR": 0.0,
+        "MSMS_NEGATIVE": 0.0,
+        "MSMS_POSITIVE": 0.0
+      },
+      "family_macro_auprc": {
+        "C13_NMR": 0.18673925291865096,
+        "H1_NMR": 0.18067371978495286,
+        "IR": 0.2367698762442994,
+        "MSMS_NEGATIVE": 0.15539595824452768,
+        "MSMS_POSITIVE": 0.15628156871565188
+      },
+      "ms_delta_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "ms_delta_vs_fixed": 0.0,
+      "overall_delta_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "overall_delta_vs_fixed": 0.0,
+      "overall_macro_auprc": 0.18317207518161654,
+      "passes_advance_rule": false,
+      "positive_family_seed_pairs": 0,
+      "spectroscopy_delta_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "spectroscopy_delta_vs_fixed": 0.0,
+      "total_family_seed_pairs": 25
+    },
+    "hybrid_peak_multiscale": {
+      "family_delta_bootstrap_95ci": {
+        "C13_NMR": [
+          -0.008018519580405125,
+          -0.004745565098563919
+        ],
+        "H1_NMR": [
+          -0.014033782421402968,
+          -0.01192493800040013
+        ],
+        "IR": [
+          -0.05693570787693471,
+          -0.04923797250415497
+        ],
+        "MSMS_NEGATIVE": [
+          0.003182070968579065,
+          0.004434809401723033
+        ],
+        "MSMS_POSITIVE": [
+          -0.008382215021338213,
+          0.0028037527146597685
+        ]
+      },
+      "family_delta_vs_fixed": {
+        "C13_NMR": -0.006179117898803826,
+        "H1_NMR": -0.013032516057558795,
+        "IR": -0.053004240373808534,
+        "MSMS_NEGATIVE": 0.0037823491919991292,
+        "MSMS_POSITIVE": -0.001516894210579467
+      },
+      "family_macro_auprc": {
+        "C13_NMR": 0.18056013501984716,
+        "H1_NMR": 0.16764120372739408,
+        "IR": 0.18376563587049086,
+        "MSMS_NEGATIVE": 0.1591783074365268,
+        "MSMS_POSITIVE": 0.15476467450507242
+      },
+      "ms_delta_bootstrap_95ci": [
+        -0.0026990329856498786,
+        0.003567849684605598
+      ],
+      "ms_delta_vs_fixed": 0.001132727490709831,
+      "overall_delta_bootstrap_95ci": [
+        -0.02249655096655521,
+        -0.006454992837985872
+      ],
+      "overall_delta_vs_fixed": -0.013990083869750298,
+      "overall_macro_auprc": 0.16918199131186626,
+      "passes_advance_rule": false,
+      "positive_family_seed_pairs": 8,
+      "spectroscopy_delta_bootstrap_95ci": [
+        -0.03498007822525696,
+        -0.01408899825442856
+      ],
+      "spectroscopy_delta_vs_fixed": -0.024071958110057055,
+      "total_family_seed_pairs": 25
+    },
+    "multiscale_conv": {
+      "family_delta_bootstrap_95ci": {
+        "C13_NMR": [
+          -0.013614763878891134,
+          -0.0033739589201313923
+        ],
+        "H1_NMR": [
+          -0.009940954351752452,
+          -0.006827184024628813
+        ],
+        "IR": [
+          0.01643791521847222,
+          0.019388789120240703
+        ],
+        "MSMS_NEGATIVE": [
+          0.000502617522987947,
+          0.0018740376218089826
+        ],
+        "MSMS_POSITIVE": [
+          -0.00010848120683644158,
+          0.0014983434888563353
+        ]
+      },
+      "family_delta_vs_fixed": {
+        "C13_NMR": -0.0073568601523807346,
+        "H1_NMR": -0.008416185114710883,
+        "IR": 0.017997876306675698,
+        "MSMS_NEGATIVE": 0.0011639698681069123,
+        "MSMS_POSITIVE": 0.000700344513118023
+      },
+      "family_macro_auprc": {
+        "C13_NMR": 0.17938239276627024,
+        "H1_NMR": 0.172257534670242,
+        "IR": 0.2547677525509751,
+        "MSMS_NEGATIVE": 0.15655992811263458,
+        "MSMS_POSITIVE": 0.15698191322876992
+      },
+      "ms_delta_bootstrap_95ci": [
+        0.00037877193270110523,
+        0.0014779697617334163
+      ],
+      "ms_delta_vs_fixed": 0.0009321571906124676,
+      "overall_delta_bootstrap_95ci": [
+        -0.002964438316900391,
+        0.004803275562277674
+      ],
+      "overall_delta_vs_fixed": 0.000817829084161803,
+      "overall_macro_auprc": 0.18398990426577835,
+      "passes_advance_rule": false,
+      "positive_family_seed_pairs": 14,
+      "spectroscopy_delta_bootstrap_95ci": [
+        -0.005574932683826312,
+        0.007345764654975907
+      ],
+      "spectroscopy_delta_vs_fixed": 0.0007416103465280266,
+      "total_family_seed_pairs": 25
+    },
+    "overlap_conv": {
+      "family_delta_bootstrap_95ci": {
+        "C13_NMR": [
+          -0.014765049946575997,
+          -0.009648000795152701
+        ],
+        "H1_NMR": [
+          -0.020854405481842475,
+          -0.018631575934953255
+        ],
+        "IR": [
+          0.0019916477009741308,
+          0.006918710677878204
+        ],
+        "MSMS_NEGATIVE": [
+          0.0001364894400689709,
+          0.0020686041406419663
+        ],
+        "MSMS_POSITIVE": [
+          -0.0013306303732657065,
+          0.0009946958815729822
+        ]
+      },
+      "family_delta_vs_fixed": {
+        "C13_NMR": -0.012156481276117875,
+        "H1_NMR": -0.01969939727276652,
+        "IR": 0.004777720614801228,
+        "MSMS_NEGATIVE": 0.001162170357689385,
+        "MSMS_POSITIVE": -3.656941814933479e-05
+      },
+      "family_macro_auprc": {
+        "C13_NMR": 0.1745827716425331,
+        "H1_NMR": 0.16097432251218635,
+        "IR": 0.24154759685910063,
+        "MSMS_NEGATIVE": 0.15655812860221704,
+        "MSMS_POSITIVE": 0.15624499929750255
+      },
+      "ms_delta_bootstrap_95ci": [
+        -0.0003066602850515225,
+        0.0013656015775568848
+      ],
+      "ms_delta_vs_fixed": 0.0005628004697700251,
+      "overall_delta_bootstrap_95ci": [
+        -0.008959520444026956,
+        -0.0015777444692751548
+      ],
+      "overall_delta_vs_fixed": -0.005190511398908624,
+      "overall_macro_auprc": 0.17798156378270794,
+      "passes_advance_rule": false,
+      "positive_family_seed_pairs": 11,
+      "spectroscopy_delta_bootstrap_95ci": [
+        -0.014168003389862764,
+        -0.0035768472324041877
+      ],
+      "spectroscopy_delta_vs_fixed": -0.00902605264469439,
+      "total_family_seed_pairs": 25
+    }
+  },
+  "numerical_winner": "multiscale_conv",
+  "protocol": {
+    "labeled_train_molecules_per_family": 800,
+    "probe": "linear",
+    "representation": "general",
+    "sampling": "random",
+    "seeds": [
+      11,
+      17,
+      23,
+      31,
+      47
+    ],
+    "test_molecules": 3000,
+    "train_molecules": 10000,
+    "validation_molecules": 3000
+  }
+}
