@@ -1,5 +1,11 @@
 # Phase B gate summary (2026-08-18)
 
+> **SUPERSEDED — see `PHASE_B_100K_RESULTS.md`.** This document reports a
+> 10k-molecule / 4k-step calibration. At Phase A's full budget (100k
+> molecules, 40k steps) both gate criteria pass and every family beats random
+> initialization. The "does not pass" verdict below reflects the budget, not
+> the Phase B repairs — as the epoch trend in that document predicted.
+
 Phase B rebuilt the MS data representation and the objective's regularization,
 then re-ran the preregistered calibration gate. **The gate does not pass.** It
 also does not reproduce the Phase A failure mode: the reason is now a compute
