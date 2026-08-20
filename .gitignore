@@ -14,3 +14,12 @@ checkpoints/
 *.pt
 *.pth
 
+
+# Regenerable evaluation artifacts (frozen embeddings are ~18 GB)
+output/embeddings/
+output/chemistry/
+# Licensed third-party source archives
+data/external/
+# Local scratch analysis scripts and rendered report pages
+tmp/
+.DS_Store

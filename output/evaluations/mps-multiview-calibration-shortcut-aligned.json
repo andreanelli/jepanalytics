@@ -1,0 +1,6 @@
+{
+  "accuracy": 0.5642857142857143,
+  "chance_accuracy": 0.2,
+  "kind": "modality_shortcut",
+  "representation": "aligned"
+}

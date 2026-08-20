@@ -1,0 +1,89 @@
+{
+  "baseline": "/Users/rebgasse/git/jepanalytics/output/evaluations/tokenizer-fixed-maskrepair-10k-audit.json",
+  "decision": "stop",
+  "kind": "prototype_alignment_learning_curve_decision",
+  "models": {
+    "prototype_10k_w02": {
+      "evaluation": "/Users/rebgasse/git/jepanalytics/output/evaluations/prototype-alignment-10k-w02-audit.json",
+      "family_delta_bootstrap_95ci": {
+        "C13_NMR": [
+          -0.004245959883468414,
+          0.0002576573422174488
+        ],
+        "H1_NMR": [
+          -0.00347272228902048,
+          0.002211394121233878
+        ],
+        "IR": [
+          -0.02442394102398952,
+          -0.01965876062832455
+        ],
+        "MSMS_NEGATIVE": [
+          0.003147996829854677,
+          0.004991823654197569
+        ],
+        "MSMS_POSITIVE": [
+          0.0014694614230170322,
+          0.003637826638987951
+        ]
+      },
+      "family_delta_vs_fixed": {
+        "C13_NMR": -0.0020135513182530486,
+        "H1_NMR": -0.00120149569370821,
+        "IR": -0.02151583395020651,
+        "MSMS_NEGATIVE": 0.004097264061838834,
+        "MSMS_POSITIVE": 0.002590750471339437
+      },
+      "family_macro_auprc": {
+        "C13_NMR": 0.18472570160039795,
+        "H1_NMR": 0.17947222409124466,
+        "IR": 0.2152540422940929,
+        "MSMS_NEGATIVE": 0.1594932223063665,
+        "MSMS_POSITIVE": 0.15887231918699135
+      },
+      "ms_delta_bootstrap_95ci": [
+        0.002469535289112539,
+        0.004191779926672863
+      ],
+      "ms_delta_vs_fixed": 0.0033440072665891357,
+      "overall_delta_bootstrap_95ci": [
+        -0.007554425969578822,
+        -0.00014077381394540564
+      ],
+      "overall_delta_vs_fixed": -0.003608573285797899,
+      "overall_macro_auprc": 0.17956350189581868,
+      "passes_scale_gate": false,
+      "positive_family_seed_pairs": 12,
+      "spectroscopy_delta_bootstrap_95ci": [
+        -0.013353718598219924,
+        -0.0034465128961788253
+      ],
+      "spectroscopy_delta_vs_fixed": -0.008243626987389256,
+      "total_family_seed_pairs": 25
+    }
+  },
+  "passing_models": [],
+  "protocol": {
+    "evaluation_molecules": {
+      "test": 3000,
+      "train": 10000,
+      "validation": 3000
+    },
+    "labeled_train_molecules_per_family": 800,
+    "probe": "linear",
+    "representation": "general",
+    "sampling": "random",
+    "seeds": [
+      11,
+      17,
+      23,
+      31,
+      47
+    ]
+  },
+  "scale_gate": {
+    "family_regression_floor": -0.005,
+    "ms_mean_delta_minimum": 0.0,
+    "spectroscopy_mean_delta_minimum": 0.01
+  }
+}

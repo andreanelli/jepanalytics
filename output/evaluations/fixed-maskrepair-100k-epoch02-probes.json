@@ -1,0 +1,807 @@
+{
+  "checkpoint": "/Users/rebgasse/git/jepanalytics/runs/pilot-fixed-maskrepair-100k-12ep/epoch-0002.pt",
+  "data_root": "/Users/rebgasse/git/jepanalytics/data/processed/pilot",
+  "kind": "few_shot_functional_group_probe",
+  "results": [
+    {
+      "acquisition": "IR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.18846450094465153,
+      "macro_f1": 0.18433385199187607,
+      "seed": 11
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1908183867638297,
+      "macro_f1": 0.18297427679329234,
+      "seed": 17
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.18887059465983252,
+      "macro_f1": 0.18148145656732015,
+      "seed": 23
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.19253501550108895,
+      "macro_f1": 0.18505062227263133,
+      "seed": 31
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.18413905071956296,
+      "macro_f1": 0.18351683690907009,
+      "seed": 47
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.23058642900780169,
+      "macro_f1": 0.2194984284552247,
+      "seed": 11
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.23232089228071104,
+      "macro_f1": 0.22183557799274173,
+      "seed": 17
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.2344374184543156,
+      "macro_f1": 0.22436928375166937,
+      "seed": 23
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.23126837047723672,
+      "macro_f1": 0.22979090679174077,
+      "seed": 31
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.23425861486397054,
+      "macro_f1": 0.22559610419348977,
+      "seed": 47
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.2615772002881797,
+      "macro_f1": 0.25010470295581066,
+      "seed": 11
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.24740916432946247,
+      "macro_f1": 0.22466930943289254,
+      "seed": 17
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.24319743995853174,
+      "macro_f1": 0.2329255776725007,
+      "seed": 23
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.2467161543302005,
+      "macro_f1": 0.23570345745186597,
+      "seed": 31
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.24702262696212215,
+      "macro_f1": 0.23499857261788906,
+      "seed": 47
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.30025095760686776,
+      "macro_f1": 0.2681219024192412,
+      "seed": 11
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.2994600988345075,
+      "macro_f1": 0.26343597520208917,
+      "seed": 17
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.2994428698601271,
+      "macro_f1": 0.2634187435636862,
+      "seed": 23
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.29839320073030046,
+      "macro_f1": 0.2640429904647726,
+      "seed": 31
+    },
+    {
+      "acquisition": "IR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.30020751475720164,
+      "macro_f1": 0.26355606690358074,
+      "seed": 47
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1557799679756111,
+      "macro_f1": 0.16083404580341173,
+      "seed": 11
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.15463324480985735,
+      "macro_f1": 0.1502980694435214,
+      "seed": 17
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.16195938128129603,
+      "macro_f1": 0.16317853781185299,
+      "seed": 23
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.16380736845466817,
+      "macro_f1": 0.1694657813192243,
+      "seed": 31
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.15901836338529732,
+      "macro_f1": 0.16246669813116002,
+      "seed": 47
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.17601270179739303,
+      "macro_f1": 0.18096309807703503,
+      "seed": 11
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.17968350852162313,
+      "macro_f1": 0.18164451897249753,
+      "seed": 17
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.17352577168737024,
+      "macro_f1": 0.17681895921632537,
+      "seed": 23
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.17906132597407615,
+      "macro_f1": 0.18492878571422128,
+      "seed": 31
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.1732319107502596,
+      "macro_f1": 0.17787005279763293,
+      "seed": 47
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18740433369688328,
+      "macro_f1": 0.19013874668095393,
+      "seed": 11
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18450057268239867,
+      "macro_f1": 0.18813878717521282,
+      "seed": 17
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18821344766991036,
+      "macro_f1": 0.1927573138808426,
+      "seed": 23
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18601118754604123,
+      "macro_f1": 0.19199389995181412,
+      "seed": 31
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18450581527522836,
+      "macro_f1": 0.1935112398870163,
+      "seed": 47
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20368738046913348,
+      "macro_f1": 0.20228135803967928,
+      "seed": 11
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.2032476769682714,
+      "macro_f1": 0.20252236994074435,
+      "seed": 17
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20428120427048435,
+      "macro_f1": 0.20290013411660976,
+      "seed": 23
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20455806264384746,
+      "macro_f1": 0.20279698054090978,
+      "seed": 31
+    },
+    {
+      "acquisition": "H1_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20374433665012515,
+      "macro_f1": 0.20257664428680064,
+      "seed": 47
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.15991915408944357,
+      "macro_f1": 0.15815495053033485,
+      "seed": 11
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.15847311091827354,
+      "macro_f1": 0.16142521177595304,
+      "seed": 17
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.16119992441660713,
+      "macro_f1": 0.1676439178536575,
+      "seed": 23
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.15919904712898508,
+      "macro_f1": 0.16198418262169084,
+      "seed": 31
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1618419796347934,
+      "macro_f1": 0.15704369015168615,
+      "seed": 47
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.18551475165571343,
+      "macro_f1": 0.18588832527600863,
+      "seed": 11
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.18088435246217657,
+      "macro_f1": 0.1827343282861383,
+      "seed": 17
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.18672240918907232,
+      "macro_f1": 0.18806671502699945,
+      "seed": 23
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.1848535846593664,
+      "macro_f1": 0.18605032746135391,
+      "seed": 31
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.18321154731710326,
+      "macro_f1": 0.18330409039445766,
+      "seed": 47
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1911022469223205,
+      "macro_f1": 0.1904285018204697,
+      "seed": 11
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.18831968238033575,
+      "macro_f1": 0.18705909935712584,
+      "seed": 17
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1907900948904132,
+      "macro_f1": 0.1898868810179294,
+      "seed": 23
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.19241581289915802,
+      "macro_f1": 0.19523803686684246,
+      "seed": 31
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.192459851258763,
+      "macro_f1": 0.19467864897451864,
+      "seed": 47
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20856320623978578,
+      "macro_f1": 0.20115281668014687,
+      "seed": 11
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.2089929188537892,
+      "macro_f1": 0.2011713351228457,
+      "seed": 17
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20870156403106097,
+      "macro_f1": 0.19988180575694092,
+      "seed": 23
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.20840224838658747,
+      "macro_f1": 0.2001479208080271,
+      "seed": 31
+    },
+    {
+      "acquisition": "C13_NMR",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.2082324071021504,
+      "macro_f1": 0.19989398461237112,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14257722819695826,
+      "macro_f1": 0.1486888767392222,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1456990730098532,
+      "macro_f1": 0.1505984767591848,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14507935588659573,
+      "macro_f1": 0.15496628687440642,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14155137527902706,
+      "macro_f1": 0.14718396452469423,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1426779313868533,
+      "macro_f1": 0.1509862719134441,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15356110475747511,
+      "macro_f1": 0.16328972160101482,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15251597111043397,
+      "macro_f1": 0.1619532164897753,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15174618637902362,
+      "macro_f1": 0.1647115514572864,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.1505052678631301,
+      "macro_f1": 0.15832077664533134,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15184853535338008,
+      "macro_f1": 0.1571776107843853,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1562581384294257,
+      "macro_f1": 0.1628154806906149,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15322562133098622,
+      "macro_f1": 0.16303833237287252,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15315640139032513,
+      "macro_f1": 0.16445313066912984,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15385897143569416,
+      "macro_f1": 0.16281225654651926,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15451176357226384,
+      "macro_f1": 0.16466031864220773,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.15991214913644627,
+      "macro_f1": 0.1605796939610431,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.15979918076082253,
+      "macro_f1": 0.16071930150698854,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.1598545708978191,
+      "macro_f1": 0.1606828372121671,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.15996689471457,
+      "macro_f1": 0.16058424646922348,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_POSITIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.15980501756463994,
+      "macro_f1": 0.16067353953844818,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14343949489642477,
+      "macro_f1": 0.14712450378694292,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14570129433635498,
+      "macro_f1": 0.14981064317140697,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14482710819150882,
+      "macro_f1": 0.15406558914656582,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.14186997407780447,
+      "macro_f1": 0.1492253821082497,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.01,
+      "labeled_molecules": 100,
+      "macro_auprc": 0.1431432209769076,
+      "macro_f1": 0.15292791899607144,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15257146304682656,
+      "macro_f1": 0.16282237639124864,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15183937272486328,
+      "macro_f1": 0.16143509055596944,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15211467754969615,
+      "macro_f1": 0.16475387167892325,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.1507182241207287,
+      "macro_f1": 0.16009374165226112,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.05,
+      "labeled_molecules": 500,
+      "macro_auprc": 0.15312212862841001,
+      "macro_f1": 0.15844419787826325,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15729443226761353,
+      "macro_f1": 0.16673946969278106,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1544611676182891,
+      "macro_f1": 0.16156778245825537,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1539987206858785,
+      "macro_f1": 0.16434009246142858,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.1546177615057148,
+      "macro_f1": 0.16262597276638022,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 0.1,
+      "labeled_molecules": 1000,
+      "macro_auprc": 0.15494108233953308,
+      "macro_f1": 0.16297336891522426,
+      "seed": 47
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.161148071679376,
+      "macro_f1": 0.16058590648904306,
+      "seed": 11
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.16071617069181215,
+      "macro_f1": 0.1605816839841992,
+      "seed": 17
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.16088217186881512,
+      "macro_f1": 0.1610895944045206,
+      "seed": 23
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.16075563754822053,
+      "macro_f1": 0.1607935395936762,
+      "seed": 31
+    },
+    {
+      "acquisition": "MSMS_NEGATIVE",
+      "fraction": 1.0,
+      "labeled_molecules": 10000,
+      "macro_auprc": 0.16094976080153076,
+      "macro_f1": 0.16061646331343904,
+      "seed": 47
+    }
+  ]
+}

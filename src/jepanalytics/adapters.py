@@ -10,7 +10,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, MutableMapping, Sequence
 
 import numpy as np
 
@@ -65,6 +65,8 @@ def chemistry_identifiers(smiles: str) -> tuple[str, str, str]:
         raise ValueError(f"invalid SMILES: {smiles!r}")
     canonical = Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
     inchi_key = Chem.MolToInchiKey(molecule)
+    if not inchi_key:
+        raise ValueError(f"structure has no usable InChIKey: {smiles!r}")
     scaffold = MurckoScaffold.MurckoScaffoldSmiles(mol=molecule, includeChirality=True)
     return canonical, inchi_key, scaffold or f"__acyclic__:{inchi_key}"
 
@@ -122,51 +124,130 @@ def _massbank_fields(text: str) -> dict[str, Any]:
     return fields
 
 
+def _first_number(values: Sequence[str], field: str) -> float:
+    """Return the first number following ``field`` in MassBank subfields."""
+
+    pattern = re.compile(rf"\b{re.escape(field)}\s+([-+]?[0-9]*\.?[0-9]+)", re.IGNORECASE)
+    for value in values:
+        match = pattern.search(value)
+        if match:
+            return float(match.group(1))
+    return 0.0
+
+
+def _license_is_allowed(value: str, allowed_licenses: Sequence[str]) -> bool:
+    normalized = " ".join(value.upper().replace("_", "-").split())
+    return any(
+        normalized == " ".join(allowed.upper().replace("_", "-").split())
+        or normalized.startswith(
+            " ".join(allowed.upper().replace("_", "-").split()) + " "
+        )
+        for allowed in allowed_licenses
+    )
+
+
+def massbank_record_signal(
+    path: str | Path,
+    *,
+    labeler: SmartsLabeler | None = None,
+    source: str = "massbank",
+    allowed_licenses: Sequence[str],
+    rejection_counts: MutableMapping[str, int] | None = None,
+) -> SpectralSignal | None:
+    """Parse one licensed, structured MS2 MassBank record.
+
+    The parser fails closed for missing ion mode, non-MS2 spectra, unusable
+    structures, and unapproved record-level licenses. ``rejection_counts`` is
+    optional so a dataset build can preserve an auditable filtering summary.
+    """
+
+    path = Path(path)
+    fields = _massbank_fields(path.read_text(errors="replace"))
+
+    def reject(reason: str) -> None:
+        if rejection_counts is not None:
+            rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+
+    accession = (fields.get("ACCESSION") or [path.stem])[0]
+    smiles = (fields.get("CH$SMILES") or [None])[0]
+    license_value = " ".join(fields.get("LICENSE", []))
+    peaks = fields["peaks"]
+    mass_fields = fields.get("AC$MASS_SPECTROMETRY", [])
+    mass_text = " ".join(mass_fields).upper()
+    if not smiles or smiles.strip().upper() in {"N/A", "NA", "NONE", "UNKNOWN"}:
+        reject("missing_smiles")
+        return None
+    if len(peaks) < 2:
+        reject("fewer_than_two_peaks")
+        return None
+    if not license_value:
+        reject("missing_license")
+        return None
+    if not _license_is_allowed(license_value, allowed_licenses):
+        reject("license_not_allowed")
+        return None
+    if not re.search(r"\bMS_TYPE\s+MS2\b", mass_text):
+        reject("not_ms2")
+        return None
+    if re.search(r"\bION_MODE\s+NEGATIVE\b", mass_text):
+        acquisition = AcquisitionFamily.MSMS_NEGATIVE
+    elif re.search(r"\bION_MODE\s+POSITIVE\b", mass_text):
+        acquisition = AcquisitionFamily.MSMS_POSITIVE
+    else:
+        reject("missing_or_unknown_ion_mode")
+        return None
+    try:
+        canonical_smiles, molecule_id, scaffold = chemistry_identifiers(smiles)
+    except (RuntimeError, ValueError):
+        reject("invalid_or_unkeyable_smiles")
+        return None
+    focused_fields = fields.get("MS$FOCUSED_ION", [])
+    precursor_mz = _first_number(focused_fields, "PRECURSOR_M/Z")
+    collision_energy = _first_number(mass_fields, "COLLISION_ENERGY")
+    coordinate, intensity = map(np.asarray, zip(*peaks, strict=True))
+    return SpectralSignal(
+        coordinate=coordinate,
+        intensity=intensity,
+        axis_type=AxisType.MASS_TO_CHARGE,
+        axis_unit=AxisUnit.MZ,
+        acquisition=acquisition,
+        molecule_id=molecule_id,
+        source=source,
+        source_id=accession,
+        scaffold_id=scaffold,
+        labels=None if labeler is None else labeler(canonical_smiles),
+        metadata={
+            "representation": "peak_list",
+            "license": license_value,
+            "record_path": str(path),
+            "precursor_mz": precursor_mz,
+            "collision_energy": collision_energy,
+            "ms_type": "MS2",
+            "canonical_smiles": canonical_smiles,
+        },
+    )
+
+
 def iter_massbank_records(
     root: str | Path,
     *,
     labeler: SmartsLabeler | None = None,
     source: str = "massbank",
     allowed_licenses: Sequence[str],
+    rejection_counts: MutableMapping[str, int] | None = None,
 ) -> Iterator[SpectralSignal]:
     """Parse open MassBank text records after a record-level license filter."""
 
     for path in sorted(Path(root).rglob("*.txt")):
-        fields = _massbank_fields(path.read_text(errors="replace"))
-        accession = (fields.get("ACCESSION") or [path.stem])[0]
-        smiles = (fields.get("CH$SMILES") or [None])[0]
-        license_value = " ".join(fields.get("LICENSE", []))
-        peaks = fields["peaks"]
-        if (
-            not smiles
-            or len(peaks) < 2
-            or not license_value
-            or not any(value.casefold() in license_value.casefold() for value in allowed_licenses)
-        ):
-            continue
-        _, molecule_id, scaffold = chemistry_identifiers(smiles)
-        ion_text = " ".join(fields.get("AC$MASS_SPECTROMETRY", [])).upper()
-        acquisition = (
-            AcquisitionFamily.MSMS_NEGATIVE if "NEGATIVE" in ion_text else AcquisitionFamily.MSMS_POSITIVE
-        )
-        coordinate, intensity = map(np.asarray, zip(*peaks, strict=True))
-        yield SpectralSignal(
-            coordinate=coordinate,
-            intensity=intensity,
-            axis_type=AxisType.MASS_TO_CHARGE,
-            axis_unit=AxisUnit.MZ,
-            acquisition=acquisition,
-            molecule_id=molecule_id,
+        signal = massbank_record_signal(
+            path,
+            labeler=labeler,
             source=source,
-            source_id=accession,
-            scaffold_id=scaffold,
-            labels=None if labeler is None else labeler(smiles),
-            metadata={
-                "representation": "peak_list",
-                "license": license_value,
-                "record_path": str(path),
-            },
+            allowed_licenses=allowed_licenses,
+            rejection_counts=rejection_counts,
         )
+        if signal is not None:
+            yield signal
 
 
 def read_jcamp_xy(path: str | Path) -> tuple[np.ndarray, np.ndarray, dict[str, str]]:

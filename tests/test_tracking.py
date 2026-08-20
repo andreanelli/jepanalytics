@@ -12,6 +12,7 @@ def test_wandb_metrics_are_grouped_and_convert_memory_to_gib():
             "epoch": 2,
             "step": 41,
             "loss": 1.25,
+            "chemistry_loss": 0.7,
             "effective_rank": 12.0,
             "accelerator_allocated_bytes": 2 * 1024**3,
             "elapsed_seconds": 1800,
@@ -19,6 +20,7 @@ def test_wandb_metrics_are_grouped_and_convert_memory_to_gib():
     )
     assert payload["trainer/global_step"] == 41
     assert payload["train/total_loss"] == 1.25
+    assert payload["train/chemistry_loss"] == 0.7
     assert payload["representation/general_effective_rank"] == 12
     assert payload["system/accelerator_allocated_gib"] == 2
     assert payload["progress/elapsed_hours"] == 0.5

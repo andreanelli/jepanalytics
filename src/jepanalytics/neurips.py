@@ -12,7 +12,7 @@ import numpy as np
 
 from .adapters import SmartsLabeler, require_approved_license
 from .data import CanonicalStoreWriter
-from .preprocessing import SignalProcessor
+from .preprocessing import DEFAULT_MS_MZ_RANGE, SignalProcessor
 from .signal import AcquisitionFamily, AxisType, AxisUnit, SpectralSignal
 from .splits import scaffold_split, split_digest
 
@@ -275,6 +275,10 @@ def _ms_signal(
         else max(candidate.exact_mass - adduct_mass, 0.0)
     )
     precursor = max(expected_precursor, float(peak_array[:, 0].max()))
+    # The precursor is recorded for provenance only.  It is computed from the
+    # exact molecular mass, so it must not define the rasterization window:
+    # doing so both makes bin indices molecule-specific and leaks the mass into
+    # every coordinate feature.  SignalProcessor pins a fixed absolute window.
     return SpectralSignal(
         coordinate=peak_array[:, 0],
         intensity=peak_array[:, 1],
@@ -289,7 +293,6 @@ def _ms_signal(
         labels=candidate.labels,
         metadata={
             "representation": "peak_list",
-            "coordinate_range": [0.0, precursor],
             "precursor_mz": precursor,
             "collision_energy": energy,
             "molecular_formula": formula,
@@ -309,6 +312,8 @@ def build_neurips_store(
     excluded_molecules_file: str | Path | None = None,
     excluded_scaffolds_file: str | Path | None = None,
     strict_scaffold: bool = False,
+    ms_mz_range: tuple[float, float] = DEFAULT_MS_MZ_RANGE,
+    include_precursor_metadata: bool = False,
 ) -> Path:
     audit = require_approved_license(license_audit, "multimodal-spectroscopic-dataset")
     labeler = SmartsLabeler(smarts_definitions)
@@ -329,7 +334,11 @@ def build_neurips_store(
         n_bins=n_bins,
         n_labels=len(labeler.names),
     )
-    processor = SignalProcessor(n_bins=n_bins)
+    processor = SignalProcessor(
+        n_bins=n_bins,
+        ms_mz_range=ms_mz_range,
+        include_precursor_metadata=include_precursor_metadata,
+    )
     dataset = _arrow_dataset(parquet_path)
     written_molecules: set[str] = set()
     dense_mapping = {
@@ -372,6 +381,8 @@ def build_neurips_store(
         raise RuntimeError(f"failed to locate {missing} selected molecules during the second pass")
     return writer.finalize(
         provenance={
+            "ms_mz_range": list(ms_mz_range),
+            "include_precursor_metadata": include_precursor_metadata,
             "kind": "neurips_2024_multimodal_spectroscopy",
             "source": str(Path(parquet_path).resolve()),
             "seed": seed,

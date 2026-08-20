@@ -1,0 +1,181 @@
+{
+  "kind": "robustness",
+  "results": [
+    {
+      "acquisition": 0,
+      "fifth_percentile": 0.9997093617916107,
+      "mean_cosine_stability": 0.99991225066185,
+      "n": 10000,
+      "perturbation": "coordinate_shift"
+    },
+    {
+      "acquisition": 1,
+      "fifth_percentile": 0.9985239207744598,
+      "mean_cosine_stability": 0.9995889246881008,
+      "n": 10000,
+      "perturbation": "coordinate_shift"
+    },
+    {
+      "acquisition": 2,
+      "fifth_percentile": 0.9994160830974579,
+      "mean_cosine_stability": 0.9998507102906704,
+      "n": 10000,
+      "perturbation": "coordinate_shift"
+    },
+    {
+      "acquisition": 3,
+      "fifth_percentile": 0.9343710899353027,
+      "mean_cosine_stability": 0.9842002571304639,
+      "n": 30000,
+      "perturbation": "coordinate_shift"
+    },
+    {
+      "acquisition": 4,
+      "fifth_percentile": 0.9661835938692093,
+      "mean_cosine_stability": 0.9886592126727104,
+      "n": 30000,
+      "perturbation": "coordinate_shift"
+    },
+    {
+      "acquisition": 0,
+      "fifth_percentile": 0.9999948143959045,
+      "mean_cosine_stability": 0.9999984758853913,
+      "n": 10000,
+      "perturbation": "broadening"
+    },
+    {
+      "acquisition": 1,
+      "fifth_percentile": 0.9998513370752334,
+      "mean_cosine_stability": 0.9999581436276436,
+      "n": 10000,
+      "perturbation": "broadening"
+    },
+    {
+      "acquisition": 2,
+      "fifth_percentile": 0.9998953908681869,
+      "mean_cosine_stability": 0.9999729187250137,
+      "n": 10000,
+      "perturbation": "broadening"
+    },
+    {
+      "acquisition": 3,
+      "fifth_percentile": 0.9857226520776748,
+      "mean_cosine_stability": 0.9962525641183059,
+      "n": 30000,
+      "perturbation": "broadening"
+    },
+    {
+      "acquisition": 4,
+      "fifth_percentile": 0.9942812085151672,
+      "mean_cosine_stability": 0.9979452417413394,
+      "n": 30000,
+      "perturbation": "broadening"
+    },
+    {
+      "acquisition": 0,
+      "fifth_percentile": 0.9371562093496323,
+      "mean_cosine_stability": 0.9527615650653839,
+      "n": 10000,
+      "perturbation": "baseline_drift"
+    },
+    {
+      "acquisition": 1,
+      "fifth_percentile": 0.9787174463272095,
+      "mean_cosine_stability": 0.9865993826210498,
+      "n": 10000,
+      "perturbation": "baseline_drift"
+    },
+    {
+      "acquisition": 2,
+      "fifth_percentile": 0.9343623727560043,
+      "mean_cosine_stability": 0.9426573657572269,
+      "n": 10000,
+      "perturbation": "baseline_drift"
+    },
+    {
+      "acquisition": 3,
+      "fifth_percentile": 0.6487091779708862,
+      "mean_cosine_stability": 0.7870944504449765,
+      "n": 30000,
+      "perturbation": "baseline_drift"
+    },
+    {
+      "acquisition": 4,
+      "fifth_percentile": 0.722409462928772,
+      "mean_cosine_stability": 0.8260265185316403,
+      "n": 30000,
+      "perturbation": "baseline_drift"
+    },
+    {
+      "acquisition": 0,
+      "fifth_percentile": 0.9987705528736115,
+      "mean_cosine_stability": 0.9996429942905903,
+      "n": 10000,
+      "perturbation": "noise"
+    },
+    {
+      "acquisition": 1,
+      "fifth_percentile": 0.9995810925960541,
+      "mean_cosine_stability": 0.9998807598948478,
+      "n": 10000,
+      "perturbation": "noise"
+    },
+    {
+      "acquisition": 2,
+      "fifth_percentile": 0.9992637574672699,
+      "mean_cosine_stability": 0.9997367566108704,
+      "n": 10000,
+      "perturbation": "noise"
+    },
+    {
+      "acquisition": 3,
+      "fifth_percentile": 0.9821215569972992,
+      "mean_cosine_stability": 0.9955136551042398,
+      "n": 30000,
+      "perturbation": "noise"
+    },
+    {
+      "acquisition": 4,
+      "fifth_percentile": 0.9903108239173889,
+      "mean_cosine_stability": 0.9973102620343367,
+      "n": 30000,
+      "perturbation": "noise"
+    },
+    {
+      "acquisition": 0,
+      "fifth_percentile": 0.999892708659172,
+      "mean_cosine_stability": 0.9999712836384773,
+      "n": 10000,
+      "perturbation": "resolution"
+    },
+    {
+      "acquisition": 1,
+      "fifth_percentile": 0.992789214849472,
+      "mean_cosine_stability": 0.9983172916233539,
+      "n": 10000,
+      "perturbation": "resolution"
+    },
+    {
+      "acquisition": 2,
+      "fifth_percentile": 0.9978989601135254,
+      "mean_cosine_stability": 0.9995300490140915,
+      "n": 10000,
+      "perturbation": "resolution"
+    },
+    {
+      "acquisition": 3,
+      "fifth_percentile": 0.9248600989580155,
+      "mean_cosine_stability": 0.9763464144388835,
+      "n": 30000,
+      "perturbation": "resolution"
+    },
+    {
+      "acquisition": 4,
+      "fifth_percentile": 0.9607371598482132,
+      "mean_cosine_stability": 0.9844072356263797,
+      "n": 30000,
+      "perturbation": "resolution"
+    }
+  ],
+  "split": "test"
+}

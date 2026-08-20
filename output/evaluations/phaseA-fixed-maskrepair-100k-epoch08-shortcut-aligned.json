@@ -1,0 +1,21 @@
+{
+  "accuracy": 0.4668888888888889,
+  "chance_accuracy": 0.3333333333333333,
+  "class_prior": [
+    0.1111111111111111,
+    0.1111111111111111,
+    0.1111111111111111,
+    0.3333333333333333,
+    0.3333333333333333
+  ],
+  "embedding_cache_subset": {
+    "max_molecules_per_split": {
+      "test": 3000,
+      "train": 10000,
+      "validation": 3000
+    },
+    "subset_seed": 20260810
+  },
+  "kind": "modality_shortcut",
+  "representation": "aligned"
+}

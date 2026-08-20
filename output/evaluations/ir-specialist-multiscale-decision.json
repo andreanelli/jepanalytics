@@ -1,0 +1,91 @@
+{
+  "comparisons": {
+    "specialist_multiscale_vs_specialist_fixed": {
+      "bootstrap_95ci": [
+        -0.04463891321063003,
+        -0.03442020172165338
+      ],
+      "ir_delta": -0.0397974326435838,
+      "seed_deltas": [
+        -0.04605033721761145,
+        -0.04294221064798698,
+        -0.03105319662797318,
+        -0.044075840484970125,
+        -0.03486557823937725
+      ]
+    },
+    "specialist_multiscale_vs_universal_fixed": {
+      "bootstrap_95ci": [
+        -0.04451092868016632,
+        -0.03726326693595932
+      ],
+      "ir_delta": -0.041147287605331484,
+      "seed_deltas": [
+        -0.0453530804895568,
+        -0.04352853131620743,
+        -0.0379640964386862,
+        -0.03473075422945171,
+        -0.044159975552755276
+      ]
+    },
+    "universal_multiscale_vs_universal_fixed": {
+      "bootstrap_95ci": [
+        0.01643791521847222,
+        0.019388789120240703
+      ],
+      "ir_delta": 0.017997876306675698,
+      "seed_deltas": [
+        0.018637410528616644,
+        0.020405300128270326,
+        0.0171813619720389,
+        0.015322745088122203,
+        0.018442563816330415
+      ]
+    }
+  },
+  "decision": "do_not_retain_ir_multiscale",
+  "kind": "ir_specialist_multiscale_control",
+  "models": {
+    "ir_specialist_fixed": {
+      "C13_NMR": 0.1811039102820558,
+      "H1_NMR": 0.16941004859356698,
+      "IR": 0.23542002128255174,
+      "MSMS_NEGATIVE": 0.1555347682357129,
+      "MSMS_POSITIVE": 0.15593962883048693
+    },
+    "ir_specialist_multiscale": {
+      "C13_NMR": 0.16833785593719156,
+      "H1_NMR": 0.16153761422991228,
+      "IR": 0.19562258863896792,
+      "MSMS_NEGATIVE": 0.1558998693230556,
+      "MSMS_POSITIVE": 0.15561543213253173
+    },
+    "universal_fixed": {
+      "C13_NMR": 0.18673925291865096,
+      "H1_NMR": 0.18067371978495286,
+      "IR": 0.2367698762442994,
+      "MSMS_NEGATIVE": 0.15539595824452768,
+      "MSMS_POSITIVE": 0.15628156871565188
+    },
+    "universal_multiscale": {
+      "C13_NMR": 0.17938239276627024,
+      "H1_NMR": 0.172257534670242,
+      "IR": 0.2547677525509751,
+      "MSMS_NEGATIVE": 0.15655992811263458,
+      "MSMS_POSITIVE": 0.15698191322876992
+    }
+  },
+  "protocol": {
+    "labeled_molecules_per_family": 800,
+    "seeds": [
+      11,
+      17,
+      23,
+      31,
+      47
+    ],
+    "test_molecules": 3000,
+    "train_molecules": 10000,
+    "validation_molecules": 3000
+  }
+}

@@ -6,6 +6,8 @@ from jepanalytics.losses import (
     covariance_regularization,
     embedding_diagnostics,
     group_centroid_regularization,
+    hard_negative_prototype_alignment_loss,
+    latent_vector_loss,
     masked_latent_loss,
     modality_centroid_alignment_loss,
     multi_positive_alignment_loss,
@@ -50,6 +52,138 @@ def test_encoder_returns_all_three_representations():
     assert torch.allclose(output.aligned.norm(dim=-1), torch.ones(3), atol=1e-5)
 
 
+def test_hard_negative_prototypes_use_leave_one_view_out_targets():
+    molecule = torch.tensor([10, 10, 10, 20, 20, 20, 30, 30, 30])
+    base = torch.eye(3).repeat_interleave(3, dim=0)
+    target = base + 0.01 * torch.randn_like(base)
+    query = base.clone().requires_grad_(True)
+    formula = torch.tensor(
+        [[0.0, 0.0]] * 3 + [[0.1, 0.0]] * 3 + [[3.0, 3.0]] * 3
+    )
+    loss, diagnostics = hard_negative_prototype_alignment_loss(
+        query,
+        target,
+        molecule,
+        formula,
+        temperature=0.1,
+        hard_negatives=1,
+    )
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert query.grad is not None
+    assert diagnostics["prototype_batch_top1"] == 1.0
+    assert diagnostics["prototype_cosine_margin"] > 0.9
+    assert diagnostics["prototype_negatives_per_anchor"] == 1.0
+
+
+def test_all_tokenizers_preserve_the_fixed_token_budget():
+    for tokenizer_type in (
+        "linear_patch",
+        "overlap_conv",
+        "multiscale_conv",
+        "hybrid_peak_multiscale",
+    ):
+        config = EncoderConfig(
+            n_bins=96,
+            patch_size=8,
+            hidden_dim=36,
+            depth=1,
+            heads=4,
+            mlp_ratio=2,
+            aligned_dim=16,
+            tokenizer_type=tokenizer_type,
+            overlap_kernel_size=15,
+            multiscale_kernel_sizes=(5, 9, 15),
+            hybrid_peak_tokens=3,
+            peak_window_size=5,
+            peak_suppression_size=5,
+        )
+        model = UniversalSpectrumEncoder(config)
+        tokenized = model.tokenize(torch.randn(2, 96))
+        assert tokenized.tokens.shape == (2, 12, 36)
+        assert tokenized.normalized_coordinate.shape == (2, 12)
+        output = model(
+            intensity=torch.randn(2, 96),
+            continuous_metadata=torch.randn(2, 10),
+            axis_type=torch.tensor([0, 1]),
+            axis_unit=torch.tensor([0, 1]),
+            acquisition=torch.tensor([0, 1]),
+        )
+        assert output.patches.shape == (2, 12, 36)
+
+
+def test_hybrid_peak_tokens_retain_exact_sorted_coordinates():
+    config = EncoderConfig(
+        n_bins=96,
+        patch_size=8,
+        hidden_dim=36,
+        depth=1,
+        heads=4,
+        aligned_dim=16,
+        tokenizer_type="hybrid_peak_multiscale",
+        multiscale_kernel_sizes=(5, 9, 15),
+        hybrid_peak_tokens=2,
+        peak_window_size=5,
+        peak_suppression_size=5,
+    )
+    model = UniversalSpectrumEncoder(config)
+    intensity = torch.zeros(1, 96)
+    intensity[0, 10] = 2.0
+    intensity[0, 70] = 3.0
+    tokenized = model.tokenize(intensity)
+    expected = torch.tensor([(10.5 / 96), (70.5 / 96)])
+    assert torch.allclose(tokenized.normalized_coordinate[0, -2:], expected)
+    assert torch.equal(tokenized.token_type[0, -2:], torch.ones(2, dtype=torch.long))
+
+
+def test_full_hybrid_resamples_128_dense_positions_to_96_plus_32_peaks():
+    model = UniversalSpectrumEncoder(
+        EncoderConfig(tokenizer_type="hybrid_peak_multiscale")
+    )
+    tokenized = model.tokenize(torch.randn(2, 4096))
+    assert tokenized.tokens.shape == (2, 128, 384)
+    assert torch.all(tokenized.token_type[:, :96] == 0)
+    assert torch.all(tokenized.token_type[:, 96:] == 1)
+
+
+def test_masked_tokens_keep_distinct_position_and_coordinate_features():
+    model = UniversalSpectrumEncoder(tiny_config())
+    captured = {}
+
+    def capture_input(_module, args):
+        captured["sequence"] = args[0].detach().clone()
+
+    handle = model.transformer.register_forward_pre_hook(capture_input)
+    mask = torch.zeros(3, 8, dtype=torch.bool)
+    mask[:, 1] = True
+    mask[:, 5] = True
+    model(**batch(), patch_mask=mask)
+    handle.remove()
+    sequence = captured["sequence"]
+    assert not torch.allclose(sequence[:, 3], sequence[:, 7])
+
+
+def test_overlap_tokenizer_cannot_read_raw_values_inside_masked_region():
+    config = EncoderConfig(
+        n_bins=96,
+        patch_size=8,
+        hidden_dim=32,
+        depth=1,
+        heads=4,
+        aligned_dim=16,
+        tokenizer_type="overlap_conv",
+        overlap_kernel_size=15,
+    )
+    model = UniversalSpectrumEncoder(config)
+    intensity = torch.zeros(1, 96)
+    intensity[0, 20] = 10.0
+    mask = torch.zeros(1, 12, dtype=torch.bool)
+    mask[:, 2] = True
+    masked = model.tokenize(intensity, patch_mask=mask).tokens
+    zero = model.tokenize(torch.zeros_like(intensity), patch_mask=mask).tokens
+    assert torch.allclose(masked, zero)
+
+
 def test_public_encode_accepts_validated_signal():
     model = UniversalSpectrumEncoder(tiny_config())
     signal = SpectralSignal(
@@ -67,11 +201,32 @@ def test_public_encode_accepts_validated_signal():
 
 
 def test_mixed_mask_has_requested_size_and_masks_peaks():
-    scores = torch.zeros(2, 12)
+    # Every patch carries signal here, so the requested ratio applies to the
+    # full row and the strongest patch is still selected by the peak component.
+    scores = torch.rand(2, 12) + 0.5
     scores[:, 7] = 100
     mask = mixed_patch_mask(scores, 0.5, generator=torch.Generator().manual_seed(2))
     assert torch.all(mask.sum(dim=1) == 6)
     assert torch.all(mask[:, 7])
+
+
+def test_mixed_mask_ratio_applies_to_informative_patches_when_sparse():
+    scores = torch.zeros(2, 12)
+    scores[:, 7] = 100
+    occupancy_aware = mixed_patch_mask(
+        scores, 0.5, generator=torch.Generator().manual_seed(2)
+    )
+    legacy = mixed_patch_mask(
+        scores,
+        0.5,
+        generator=torch.Generator().manual_seed(2),
+        occupancy_aware=False,
+    )
+    # Only the one occupied patch is a valid target; masking half of all twelve
+    # would make the objective solvable by predicting an empty patch.
+    assert torch.all(occupancy_aware.sum(dim=1) == 1)
+    assert torch.all(occupancy_aware[:, 7])
+    assert torch.all(legacy.sum(dim=1) == 6)
 
 
 def test_losses_and_collapse_diagnostics_are_finite():
@@ -79,6 +234,7 @@ def test_losses_and_collapse_diagnostics_are_finite():
     target = predicted + 0.05 * torch.randn_like(predicted)
     mask = torch.tensor([[1, 0, 1, 0], [0, 1, 0, 1]], dtype=torch.bool)
     assert masked_latent_loss(predicted, target, mask) < 0.1
+    assert latent_vector_loss(predicted[:, 0], target[:, 0]) < 0.1
     aligned = torch.eye(4)
     assert symmetric_alignment_loss(aligned, aligned) < symmetric_alignment_loss(
         aligned, aligned.flip(0)
@@ -175,3 +331,18 @@ def test_default_encoder_parameter_count_matches_preregistered_range():
     model = UniversalSpectrumEncoder()
     count = sum(parameter.numel() for parameter in model.parameters())
     assert 20_000_000 <= count <= 25_000_000
+
+
+def test_tokenizer_variants_are_parameter_matched_within_five_percent():
+    counts = []
+    for tokenizer_type in (
+        "linear_patch",
+        "overlap_conv",
+        "multiscale_conv",
+        "hybrid_peak_multiscale",
+    ):
+        model = UniversalSpectrumEncoder(
+            EncoderConfig(tokenizer_type=tokenizer_type)
+        )
+        counts.append(sum(parameter.numel() for parameter in model.parameters()))
+    assert max(counts) / min(counts) < 1.05
